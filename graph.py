@@ -1,4 +1,4 @@
-from treeDecomp import Bag, Tree
+from treeDecomp import Bag, Tree, TreeDecomposition
 
 class Vertex:
     def __init__(self, label):
@@ -69,7 +69,7 @@ class Graph:
 def minimal_degree_ordering(g):
     ordering = []
     #print("g Vertices: " + str(g.vertices))
-    h = Graph(g.vertices.copy(), g.edges.copy())
+    h = Graph(g.vertices.copy(), [e.copy()for e in g.edges])
     for i in range(1,len(h.vertices)):
         degrees = h.get_degree_dict()
         min_deg_vert = min(degrees, key=degrees.get)
@@ -113,7 +113,19 @@ def permutationToTreeDecomposition(graph:Graph, vertexList):
             if vertexList[j] in bags[vertexList[i]].vertices:
                 resTree.add_edge(bags[vertexList[i]], bags[vertexList[j]])
                 break
+    print("Edges of TD: " + str(resTree.F))
     return resTree
+
+#minimization not working!!!!
+def minimize_TreeDecomposition(treeDecomp:TreeDecomposition):
+    treeDecopm_copy = TreeDecomposition(treeDecomp.bags.copy(), Tree(treeDecomp.tree.I.copy(), treeDecomp.tree.F.copy()))
+    bag_dict = treeDecopm_copy.tree.I
+    for i in bag_dict:
+        for j in bag_dict:
+            if bag_dict[i] != bag_dict[j] and bag_dict[i] <= bag_dict[j]:
+                treeDecopm_copy.combine_bags(j, i)
+                break
+    return treeDecopm_copy
 
 if __name__ == "__main__":
     a = Vertex("a")
@@ -156,4 +168,10 @@ if __name__ == "__main__":
     #print([x.label for x in minimal_degree_ordering(graph2)])
     #print(permutationToTreeDecomposition(graph2, minimal_degree_ordering(graph2), []))
     #print(graph2_copy.edges)
-    print(permutationToTreeDecomposition(graph2_copy, [v10, v9, v8, v7, v2, v3, v6, v1, v5, v4]))
+    tree = permutationToTreeDecomposition(graph2_copy, [v10, v9, v8, v7, v2, v3, v6, v1, v5, v4])
+    treeDecomp = TreeDecomposition(tree.I, tree)
+    print("Before minimization:")
+    print(treeDecomp)
+    minimized = minimize_TreeDecomposition(treeDecomp)
+    print("After minimization:")    
+    print(minimized)

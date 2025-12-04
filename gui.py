@@ -2,7 +2,8 @@ import customtkinter as ctk
 import tkinter as tk
 from tkinter import messagebox
 import math
-from graph import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition
+from graph import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition, minimize_TreeDecomposition
+from treeDecomp import TreeDecomposition
 
 class GraphGUI:
     def __init__(self, root):
@@ -84,8 +85,9 @@ class GraphGUI:
         # Action buttons
         button_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
         button_frame.grid(row=10, column=0, columnspan=4, padx=20, pady=15)
-        ctk.CTkButton(button_frame, text="Clear All", command=self.clear_all, width=130, fg_color="#d32f2f", hover_color="#9a0007").pack(side="left", padx=5)
-        ctk.CTkButton(button_frame, text="Compute", command=self.compute_tree_decomposition, width=130, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=5)
+        ctk.CTkButton(button_frame, text="Clear All", command=self.clear_all, width=85, fg_color="#d32f2f", hover_color="#9a0007").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Compute", command=self.compute_tree_decomposition, width=85, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Minimize", command=self.minimize_tree_decomposition, width=85, fg_color="#f57c00", hover_color="#e65100").pack(side="left", padx=3)
         
         # Ordering options
         ctk.CTkLabel(control_frame, text="Vertex Ordering:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=12, column=0, columnspan=4, sticky="w", padx=20, pady=(15, 5))
@@ -320,6 +322,7 @@ class GraphGUI:
         # Get vertex ordering
         if self.ordering_var.get() == "minimal_degree":
             ordering = minimal_degree_ordering(graph_copy)
+            print(str([v.label for v in ordering]))
         else:
             custom_str = self.custom_order_entry.get().strip()
             if not custom_str:
@@ -333,8 +336,23 @@ class GraphGUI:
         
         # Compute tree decomposition
         graph_copy2 = Graph(vertex_list.copy(), [e.copy() for e in self.edges])
-        self.tree_decomposition = permutationToTreeDecomposition(graph_copy2, ordering)
+        self.tree = permutationToTreeDecomposition(graph_copy2, ordering)
+        self.tree_decomposition = TreeDecomposition(self.tree.I, self.tree)
         
+        self.draw_tree_decomposition()
+    
+    def minimize_tree_decomposition(self):
+        if not self.tree_decomposition:
+            messagebox.showwarning("No Tree Decomposition", "Please compute a tree decomposition first")
+            return
+        
+        # Minimize the tree decomposition
+        self.tree_decomposition = minimize_TreeDecomposition(self.tree_decomposition)
+        
+        # Clear bag positions to force recalculation with new structure
+        self.bag_positions.clear()
+        
+        # Redraw the tree decomposition
         self.draw_tree_decomposition()
         
     def draw_tree_decomposition(self):
@@ -342,8 +360,8 @@ class GraphGUI:
         if not self.tree_decomposition:
             return
         
-        bags = self.tree_decomposition.I
-        edges = self.tree_decomposition.F
+        bags = self.tree_decomposition.tree.I
+        edges = self.tree_decomposition.tree.F
         
         if not bags:
             return
@@ -370,8 +388,8 @@ class GraphGUI:
         # Draw edges between bags with modern style
         for edge in edges:
             bags_list = list(edge)
-            b1_label = str(bags_list[0])
-            b2_label = str(bags_list[1])
+            b1_label = bags_list[0].label
+            b2_label = bags_list[1].label
             if b1_label in self.bag_positions and b2_label in self.bag_positions:
                 x1, y1 = self.bag_positions[b1_label]
                 x2, y2 = self.bag_positions[b2_label]

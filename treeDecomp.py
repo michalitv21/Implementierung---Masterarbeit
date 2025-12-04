@@ -37,3 +37,19 @@ class TreeDecomposition:
 
     def __repr__(self):
         return "bags: " + str(self.bags) +"\nedges: " + str(self.tree.F)
+    
+    def combine_bags(self, into, remove):
+        # Combine the vertices of remove into into
+        into.vertices = into.vertices.union(remove.vertices)
+        # Update tree edges
+        for e in self.tree.F.copy():
+            if remove in e:
+                other_bag = (e - set([remove])).pop()
+                self.tree.F.remove(e)
+                if other_bag != into:
+                    self.tree.add_edge(into, other_bag)
+        # Remove the bag
+        if remove in self.bags:
+            self.bags.remove(remove)
+        if remove in self.tree.I:
+            del self.tree.I[remove.label]
