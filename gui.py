@@ -1,9 +1,12 @@
 import customtkinter as ctk
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import math
+import json
+import os
 from graph import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition, minimize_TreeDecomposition
 from treeDecomp import TreeDecomposition
+from graph_loader import load_graph_from_adjacency_list, load_graph_from_edge_list
 
 class GraphGUI:
     def __init__(self, root):
@@ -15,11 +18,15 @@ class GraphGUI:
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
         
+        # File persistence
+        self.graphs_file = os.path.join(os.path.dirname(__file__), "saved_graphs.json")
+        
         # Data structures
         self.vertices = {}  # label -> Vertex
         self.edges = []  # list of sets {v1, v2}
         self.graph = None
         self.tree_decomposition = None
+        self.saved_graphs = {}  # name -> (vertices, edges)
         
         # Canvas positions for dragging
         self.vertex_positions = {}  # label -> (x, y)
@@ -27,6 +34,9 @@ class GraphGUI:
         self.dragging = None
         self.drag_start_x = 0
         self.drag_start_y = 0
+        
+        # Load graphs from file
+        self.load_graphs_from_file()
         
         self.setup_ui()
         
@@ -37,7 +47,10 @@ class GraphGUI:
         
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=1)
+        main_frame.columnconfigure(0, weight=0)  # Left: fixed width
+        main_frame.columnconfigure(1, weight=1)  # Middle: expandable
+        main_frame.columnconfigure(2, weight=0)  # Right: fixed width
+        main_frame.rowconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
         
         # Left panel - Controls
@@ -104,7 +117,7 @@ class GraphGUI:
         
         # Right panel - Visualizations
         viz_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        viz_frame.grid(row=0, column=1, rowspan=2, sticky="nsew")
+        viz_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(0, 15))
         viz_frame.columnconfigure(0, weight=1)
         viz_frame.rowconfigure(0, weight=1)
         viz_frame.rowconfigure(1, weight=1)
@@ -136,6 +149,48 @@ class GraphGUI:
         self.tree_canvas.bind("<Button-1>", self.on_tree_click)
         self.tree_canvas.bind("<B1-Motion>", self.on_tree_drag)
         self.tree_canvas.bind("<ButtonRelease-1>", self.on_tree_release)
+        
+        # Right panel - Save/Load
+        save_load_frame = ctk.CTkFrame(main_frame, corner_radius=15)
+        save_load_frame.grid(row=0, column=2, rowspan=2, sticky="nsew", padx=(15, 0))
+        save_load_frame.columnconfigure(0, weight=1)
+        
+        ctk.CTkLabel(save_load_frame, text="Save / Load", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 15))
+        
+        # File loading section
+        ctk.CTkLabel(save_load_frame, text="Load from File", font=ctk.CTkFont(size=12, weight="bold")).grid(row=1, column=0, sticky="w", padx=20, pady=(10, 5))
+        self.file_path_entry = ctk.CTkEntry(save_load_frame, width=220, placeholder_text=".lst or .txt file")
+        self.file_path_entry.grid(row=2, column=0, padx=20, pady=5)
+        
+        file_button_frame = ctk.CTkFrame(save_load_frame, fg_color="transparent")
+        file_button_frame.grid(row=3, column=0, padx=20, pady=10)
+        ctk.CTkButton(file_button_frame, text="Browse", command=self.browse_file, width=95, fg_color="#9c27b0", hover_color="#6a1b9a").pack(side="left", padx=3)
+        ctk.CTkButton(file_button_frame, text="Load", command=self.load_from_file, width=95, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=3)
+        
+        # Save section
+        ctk.CTkLabel(save_load_frame, text="Save Graph", font=ctk.CTkFont(size=12, weight="bold")).grid(row=4, column=0, sticky="w", padx=20, pady=(15, 5))
+        self.save_name_entry = ctk.CTkEntry(save_load_frame, width=220, placeholder_text="Graph name")
+        self.save_name_entry.grid(row=5, column=0, padx=20, pady=5)
+        ctk.CTkButton(save_load_frame, text="Save Graph", command=self.save_graph, width=200, fg_color="#1f6aa5", hover_color="#144870").grid(row=6, column=0, padx=20, pady=10)
+        
+        # Saved graphs list
+        ctk.CTkLabel(save_load_frame, text="Saved Graphs", font=ctk.CTkFont(size=12, weight="bold")).grid(row=7, column=0, sticky="w", padx=20, pady=(15, 5))
+        self.saved_graphs_list = ctk.CTkTextbox(save_load_frame, width=220, height=120, font=ctk.CTkFont(family="Consolas", size=9))
+        self.saved_graphs_list.grid(row=8, column=0, padx=20, pady=5)
+        
+        # Load section
+        ctk.CTkLabel(save_load_frame, text="Load Saved Graph", font=ctk.CTkFont(size=12, weight="bold")).grid(row=9, column=0, sticky="w", padx=20, pady=(15, 5))
+        self.load_name_entry = ctk.CTkEntry(save_load_frame, width=220, placeholder_text="Graph name to load")
+        self.load_name_entry.grid(row=10, column=0, padx=20, pady=5)
+        
+        button_frame = ctk.CTkFrame(save_load_frame, fg_color="transparent")
+        button_frame.grid(row=11, column=0, padx=20, pady=10)
+        ctk.CTkButton(button_frame, text="Load", command=self.load_graph, width=70, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Delete", command=self.delete_graph, width=70, fg_color="#d32f2f", hover_color="#9a0007").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Refresh", command=self.refresh_saved_graphs, width=70, fg_color="#f57c00", hover_color="#e65100").pack(side="left", padx=3)
+        
+        # Initialize saved graphs display
+        self.refresh_saved_graphs()
         
     def add_vertex(self):
         label = self.vertex_entry.get().strip()
@@ -314,10 +369,25 @@ class GraphGUI:
             messagebox.showwarning("No Graph", "Please add vertices first")
             return
         
-        # Create a copy of the graph
-        vertex_list = list(self.vertices.values())
-        edge_list = [e.copy() for e in self.edges]
-        graph_copy = Graph(vertex_list.copy(), edge_list)
+        # Clear previous tree decomposition artifacts
+        self.bag_positions.clear()
+        self.tree_decomposition = None
+        self.tree_canvas.delete("all")
+        
+        # Create NEW vertex objects (not references) for the computation
+        vertex_map = {label: Vertex(label) for label in self.vertices.keys()}
+        vertex_list = list(vertex_map.values())
+        
+        # Create edges with the new vertex objects
+        edge_list = []
+        for edge in self.edges:
+            edge_vertices = list(edge)
+            v1_label = str(edge_vertices[0])
+            v2_label = str(edge_vertices[1])
+            new_edge = {vertex_map[v1_label], vertex_map[v2_label]}
+            edge_list.append(new_edge)
+        
+        graph_copy = Graph(vertex_list, edge_list)
         
         # Get vertex ordering
         if self.ordering_var.get() == "minimal_degree":
@@ -332,11 +402,24 @@ class GraphGUI:
             if set(labels) != set(self.vertices.keys()):
                 messagebox.showwarning("Invalid Ordering", "Ordering must include all vertices exactly once")
                 return
-            ordering = [self.vertices[l] for l in labels]
+            ordering = [vertex_map[l] for l in labels]
         
-        # Compute tree decomposition
-        graph_copy2 = Graph(vertex_list.copy(), [e.copy() for e in self.edges])
-        self.tree = permutationToTreeDecomposition(graph_copy2, ordering)
+        # Create a second fresh graph copy for decomposition
+        vertex_map2 = {label: Vertex(label) for label in self.vertices.keys()}
+        vertex_list2 = list(vertex_map2.values())
+        edge_list2 = []
+        for edge in self.edges:
+            edge_vertices = list(edge)
+            v1_label = str(edge_vertices[0])
+            v2_label = str(edge_vertices[1])
+            new_edge = {vertex_map2[v1_label], vertex_map2[v2_label]}
+            edge_list2.append(new_edge)
+        
+        # Convert ordering to use vertices from vertex_map2
+        ordering2 = [vertex_map2[v.label] for v in ordering]
+        
+        graph_copy2 = Graph(vertex_list2, edge_list2)
+        self.tree = permutationToTreeDecomposition(graph_copy2, ordering2)
         self.tree_decomposition = TreeDecomposition(self.tree.I, self.tree)
         
         self.draw_tree_decomposition()
@@ -439,10 +522,173 @@ class GraphGUI:
             
     def on_tree_release(self, event):
         self.dragging = None
+    
+    def browse_file(self):
+        """Open file dialog to select a graph file"""
+        file_types = [("Graph Files", "*.lst *.txt"), ("Adjacency List", "*.lst"), ("Edge List", "*.txt"), ("All Files", "*.*")]
+        file_path = filedialog.askopenfilename(filetypes=file_types, title="Load Graph File")
+        if file_path:
+            self.file_path_entry.delete(0, tk.END)
+            self.file_path_entry.insert(0, file_path)
+    
+    def load_from_file(self):
+        """Load a graph from the selected file"""
+        file_path = self.file_path_entry.get().strip()
+        if not file_path:
+            messagebox.showwarning("Input Error", "Please select a file or enter a file path")
+            return
+        
+        if not os.path.exists(file_path):
+            messagebox.showerror("File Not Found", f"File '{file_path}' does not exist")
+            return
+        
+        try:
+            # Determine file type by extension
+            if file_path.endswith('.lst'):
+                graph = load_graph_from_adjacency_list(file_path)
+            elif file_path.endswith('.txt'):
+                graph = load_graph_from_edge_list(file_path)
+            else:
+                # Try adjacency list first, then edge list
+                graph = load_graph_from_adjacency_list(file_path)
+                if not graph:
+                    graph = load_graph_from_edge_list(file_path)
+            
+            if not graph:
+                messagebox.showerror("Error", "Failed to load graph from file")
+                return
+            
+            # Clear current graph
+            self.vertices.clear()
+            self.edges.clear()
+            self.vertex_positions.clear()
+            self.tree_decomposition = None
+            self.bag_positions.clear()
+            
+            # Load graph data
+            self.vertices = {v.label: v for v in graph.vertices}
+            self.edges = graph.edges
+            
+            # Update UI
+            self.update_lists()
+            self.draw_graph()
+            self.tree_canvas.delete("all")
+            
+            messagebox.showinfo("Success", f"Graph loaded successfully!\nVertices: {len(graph.vertices)}, Edges: {len(graph.edges)}")
+            self.file_path_entry.delete(0, tk.END)
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error loading graph: {str(e)}")
+    
+    def save_graph(self):
+        name = self.save_name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("Input Error", "Please enter a graph name")
+            return
+        
+        if not self.vertices:
+            messagebox.showwarning("Empty Graph", "Please add vertices first")
+            return
+        
+        # Convert vertices and edges to serializable format
+        vertices_data = {label: label for label in self.vertices.keys()}
+        edges_data = [sorted([str(v) for v in e]) for e in self.edges]
+        
+        self.saved_graphs[name] = {
+            "vertices": vertices_data,
+            "edges": edges_data
+        }
+        
+        self.save_graphs_to_file()
+        messagebox.showinfo("Success", f"Graph '{name}' saved successfully")
+        self.save_name_entry.delete(0, tk.END)
+        self.refresh_saved_graphs()
+    
+    def load_graph(self):
+        name = self.load_name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("Input Error", "Please enter a graph name")
+            return
+        
+        if name not in self.saved_graphs:
+            messagebox.showwarning("Not Found", f"Graph '{name}' not found")
+            return
+        
+        # Clear current graph
+        self.vertices.clear()
+        self.edges.clear()
+        self.vertex_positions.clear()
+        
+        # Load graph data
+        graph_data = self.saved_graphs[name]
+        
+        # Load vertices
+        for label in graph_data["vertices"].keys():
+            self.vertices[label] = Vertex(label)
+        
+        # Load edges
+        for edge_data in graph_data["edges"]:
+            if len(edge_data) == 2 and edge_data[0] in self.vertices and edge_data[1] in self.vertices:
+                self.edges.append({self.vertices[edge_data[0]], self.vertices[edge_data[1]]})
+        
+        self.update_lists()
+        self.draw_graph()
+        self.load_name_entry.delete(0, tk.END)
+        messagebox.showinfo("Success", f"Graph '{name}' loaded successfully")
+    
+    def delete_graph(self):
+        name = self.load_name_entry.get().strip()
+        if not name:
+            messagebox.showwarning("Input Error", "Please enter a graph name")
+            return
+        
+        if name not in self.saved_graphs:
+            messagebox.showwarning("Not Found", f"Graph '{name}' not found")
+            return
+        
+        del self.saved_graphs[name]
+        self.save_graphs_to_file()
+        messagebox.showinfo("Success", f"Graph '{name}' deleted successfully")
+        self.load_name_entry.delete(0, tk.END)
+        self.refresh_saved_graphs()
+    
+    def refresh_saved_graphs(self):
+        self.saved_graphs_list.delete("1.0", "end")
+        if not self.saved_graphs:
+            self.saved_graphs_list.insert("1.0", "No saved graphs")
+        else:
+            graphs_text = "\n".join(sorted(self.saved_graphs.keys()))
+            self.saved_graphs_list.insert("1.0", graphs_text)
+    
+    def load_graphs_from_file(self):
+        """Load saved graphs from JSON file"""
+        if os.path.exists(self.graphs_file):
+            try:
+                with open(self.graphs_file, 'r') as f:
+                    self.saved_graphs = json.load(f)
+            except Exception as e:
+                print(f"Error loading graphs from file: {e}")
+                self.saved_graphs = {}
+        else:
+            self.saved_graphs = {}
+    
+    def save_graphs_to_file(self):
+        """Save all graphs to JSON file"""
+        try:
+            with open(self.graphs_file, 'w') as f:
+                json.dump(self.saved_graphs, f, indent=2)
+        except Exception as e:
+            print(f"Error saving graphs to file: {e}")
+    
+    def on_closing(self):
+        """Handle window closing - save graphs before exit"""
+        self.save_graphs_to_file()
+        self.root.destroy()
 
 if __name__ == "__main__":
     ctk.set_appearance_mode("dark")
     ctk.set_default_color_theme("blue")
     root = ctk.CTk()
     app = GraphGUI(root)
+    root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
