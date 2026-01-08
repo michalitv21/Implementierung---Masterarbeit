@@ -1,4 +1,4 @@
-from treeDecomp import Bag, Tree, TreeDecomposition
+from treeDecomp import Bag, Tree, Node, TreeDecomposition
 
 class Vertex:
     def __init__(self, label):
@@ -83,13 +83,13 @@ def minimal_degree_ordering(g):
     
 def createBags(graph:Graph, vertexList, bags):
     if (len(vertexList) == 1):
-        bags[vertexList[0]] = Bag(vertexList[0].label, [vertexList[0]])
+        bags[vertexList[0]] = Bag(vertexList[0].label, {vertexList[0]})
         return bags
     next_vert = vertexList[0]
     #print("Vertex 0: " + str(vertexList[0].label))
     #print(vertexList)
     #print(vertexList[0])
-    bag = Bag(next_vert.label, [next_vert])
+    bag = Bag(next_vert.label, {next_vert})
     for n in graph.get_adj_verts(next_vert):
         bag.add_vertex(n)
     bags[next_vert] = bag
@@ -116,16 +116,26 @@ def permutationToTreeDecomposition(graph:Graph, vertexList):
     print("Edges of TD: " + str(resTree.F))
     return resTree
 
-#minimization not working!!!!
-def minimize_TreeDecomposition(treeDecomp:TreeDecomposition):
-    treeDecopm_copy = TreeDecomposition(treeDecomp.bags.copy(), Tree(treeDecomp.tree.I.copy(), treeDecomp.tree.F.copy()))
-    bag_dict = treeDecopm_copy.tree.I
-    for i in bag_dict:
-        for j in bag_dict:
-            if bag_dict[i] != bag_dict[j] and bag_dict[i] <= bag_dict[j]:
-                treeDecopm_copy.combine_bags(j, i)
-                break
-    return treeDecopm_copy
+def num_of_splits(children:int):
+    if children_count <= 1:
+        return 0
+    return children_count -1
+
+def make_nice_decomposition_from_root_node(root_node:Node, treeDecomp:TreeDecomposition, res_nodes:list):
+    res_nodes.append(root_node)
+    if len(root_node.children) > 1:
+        #Introduce a series of join nodes
+        first_child = root_node.children[0]
+        new_join_node = Node(root_node.label, [first_child])
+        res_nodes.append(new_join_node)
+        for child in root_node.children[1:]:
+            next_join_node = Node(root_node.label, [child])
+            res_nodes.append(next_join_node)
+            new_join_node.add_child(next_join_node)
+            new_join_node = next_join_node
+        return
+    
+
 
 if __name__ == "__main__":
     a = Vertex("a")
@@ -170,8 +180,8 @@ if __name__ == "__main__":
     #print(graph2_copy.edges)
     tree = permutationToTreeDecomposition(graph2_copy, [v10, v9, v8, v7, v2, v3, v6, v1, v5, v4])
     treeDecomp = TreeDecomposition(tree.I, tree)
-    print("Before minimization:")
+    print("Before nice:")
     print(treeDecomp)
-    minimized = minimize_TreeDecomposition(treeDecomp)
-    print("After minimization:")    
-    print(minimized)
+    print("After nice:")
+    make_nice_decomposition(treeDecomp)
+    print(treeDecomp)
