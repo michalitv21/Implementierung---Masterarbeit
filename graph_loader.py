@@ -6,7 +6,7 @@ Supports various adjacency list formats:
 2. Vertex neighbor1 neighbor2 ...
 """
 
-from graph import Graph, Vertex
+from graphLib import Graph, Vertex
 
 
 def load_graph_from_adjacency_list(file_path):

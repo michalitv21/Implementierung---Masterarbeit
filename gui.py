@@ -4,8 +4,8 @@ from tkinter import messagebox, filedialog
 import math
 import json
 import os
-from graph import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition, minimize_TreeDecomposition
-from treeDecomp import TreeDecomposition
+from graphLib import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition
+from treeDecomp import TreeDecomposition, RootedTree, Node
 from graph_loader import load_graph_from_adjacency_list, load_graph_from_edge_list
 
 class GraphGUI:
@@ -26,11 +26,14 @@ class GraphGUI:
         self.edges = []  # list of sets {v1, v2}
         self.graph = None
         self.tree_decomposition = None
+        self.rooted_tree = None  # RootedTree representation
+        self.root_bag = None  # Selected root bag for rooted tree
         self.saved_graphs = {}  # name -> (vertices, edges)
         
         # Canvas positions for dragging
         self.vertex_positions = {}  # label -> (x, y)
         self.bag_positions = {}  # bag_label -> (x, y)
+        self.node_positions = {}  # node_label -> (x, y) for rooted tree
         self.dragging = None
         self.drag_start_x = 0
         self.drag_start_y = 0
@@ -48,8 +51,9 @@ class GraphGUI:
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=1)
         main_frame.columnconfigure(0, weight=0)  # Left: fixed width
-        main_frame.columnconfigure(1, weight=1)  # Middle: expandable
-        main_frame.columnconfigure(2, weight=0)  # Right: fixed width
+        main_frame.columnconfigure(1, weight=1)  # Middle-left: expandable
+        main_frame.columnconfigure(2, weight=1)  # Middle-right: expandable
+        main_frame.columnconfigure(3, weight=0)  # Right: fixed width
         main_frame.rowconfigure(0, weight=1)
         main_frame.rowconfigure(1, weight=1)
         
@@ -98,9 +102,8 @@ class GraphGUI:
         # Action buttons
         button_frame = ctk.CTkFrame(control_frame, fg_color="transparent")
         button_frame.grid(row=10, column=0, columnspan=4, padx=20, pady=15)
-        ctk.CTkButton(button_frame, text="Clear All", command=self.clear_all, width=85, fg_color="#d32f2f", hover_color="#9a0007").pack(side="left", padx=3)
-        ctk.CTkButton(button_frame, text="Compute", command=self.compute_tree_decomposition, width=85, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=3)
-        ctk.CTkButton(button_frame, text="Minimize", command=self.minimize_tree_decomposition, width=85, fg_color="#f57c00", hover_color="#e65100").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Clear All", command=self.clear_all, width=80, fg_color="#d32f2f", hover_color="#9a0007").pack(side="left", padx=3)
+        ctk.CTkButton(button_frame, text="Compute", command=self.compute_tree_decomposition, width=80, fg_color="#2e7d32", hover_color="#1b5e20").pack(side="left", padx=3)
         
         # Ordering options
         ctk.CTkLabel(control_frame, text="Vertex Ordering:", font=ctk.CTkFont(size=12, weight="bold")).grid(row=12, column=0, columnspan=4, sticky="w", padx=20, pady=(15, 5))
@@ -115,10 +118,11 @@ class GraphGUI:
         self.custom_order_entry = ctk.CTkEntry(control_frame, width=300, placeholder_text="v1, v2, v3, ...")
         self.custom_order_entry.grid(row=15, column=0, columnspan=4, padx=20, pady=(0, 20))
         
-        # Right panel - Visualizations
+        # Right panel - Visualizations (column 1-2 for tree decomposition and rooted tree)
         viz_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        viz_frame.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(0, 15))
+        viz_frame.grid(row=0, column=1, columnspan=2, rowspan=2, sticky="nsew", padx=(0, 15))
         viz_frame.columnconfigure(0, weight=1)
+        viz_frame.columnconfigure(1, weight=1)
         viz_frame.rowconfigure(0, weight=1)
         viz_frame.rowconfigure(1, weight=1)
         
@@ -142,17 +146,39 @@ class GraphGUI:
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(1, weight=1)
         
-        ctk.CTkLabel(tree_frame, text="Tree Decomposition", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 10))
+        tree_header_frame = ctk.CTkFrame(tree_frame, fg_color="transparent")
+        tree_header_frame.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 5))
+        ctk.CTkLabel(tree_header_frame, text="Tree Decomposition", font=ctk.CTkFont(size=16, weight="bold")).pack(side="left")
         
-        self.tree_canvas = ctk.CTkCanvas(tree_frame, bg="#1a1a1a", width=800, height=350, highlightthickness=0)
+        # Root selection
+        ctk.CTkLabel(tree_header_frame, text="Root:", font=ctk.CTkFont(size=11)).pack(side="left", padx=(20, 5))
+        self.root_var = tk.StringVar(value="")
+        self.root_combo = ctk.CTkComboBox(tree_header_frame, variable=self.root_var, width=100, 
+                                          values=[], command=self.on_root_changed, font=ctk.CTkFont(size=10))
+        self.root_combo.pack(side="left", padx=5)
+        ctk.CTkButton(tree_header_frame, text="Rooted", command=self.convert_to_rooted_tree, 
+                     width=70, fg_color="#1565c0", hover_color="#0d47a1").pack(side="left", padx=5)
+        
+        self.tree_canvas = ctk.CTkCanvas(tree_frame, bg="#1a1a1a", width=400, height=350, highlightthickness=0)
         self.tree_canvas.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
         self.tree_canvas.bind("<Button-1>", self.on_tree_click)
         self.tree_canvas.bind("<B1-Motion>", self.on_tree_drag)
         self.tree_canvas.bind("<ButtonRelease-1>", self.on_tree_release)
         
+        # Rooted tree canvas
+        rooted_frame = ctk.CTkFrame(viz_frame, corner_radius=15)
+        rooted_frame.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
+        rooted_frame.columnconfigure(0, weight=1)
+        rooted_frame.rowconfigure(1, weight=1)
+        
+        ctk.CTkLabel(rooted_frame, text="Rooted Tree", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 10))
+        
+        self.rooted_canvas = ctk.CTkCanvas(rooted_frame, bg="#1a1a1a", width=400, height=350, highlightthickness=0)
+        self.rooted_canvas.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
+        
         # Right panel - Save/Load
         save_load_frame = ctk.CTkFrame(main_frame, corner_radius=15)
-        save_load_frame.grid(row=0, column=2, rowspan=2, sticky="nsew", padx=(15, 0))
+        save_load_frame.grid(row=0, column=3, rowspan=2, sticky="nsew", padx=(15, 0))
         save_load_frame.columnconfigure(0, weight=1)
         
         ctk.CTkLabel(save_load_frame, text="Save / Load", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w", padx=20, pady=(20, 15))
@@ -282,7 +308,9 @@ class GraphGUI:
         self.edges.clear()
         self.vertex_positions.clear()
         self.bag_positions.clear()
+        self.node_positions.clear()
         self.tree_decomposition = None
+        self.rooted_tree = None
         self.update_lists()
         self.draw_graph()
         self.tree_canvas.delete("all")
@@ -392,6 +420,14 @@ class GraphGUI:
         # Get vertex ordering
         if self.ordering_var.get() == "minimal_degree":
             ordering = minimal_degree_ordering(graph_copy)
+            # Ensure ordering includes ALL vertices (append any missing ones)
+            if len(ordering) != len(vertex_list):
+                have = {v for v in ordering}
+                missing = [v for v in vertex_list if v not in have]
+                if missing:
+                    # Append missing vertices in a stable label order
+                    for mv in sorted(missing, key=lambda x: x.label):
+                        ordering.append(mv)
             print(str([v.label for v in ordering]))
         else:
             custom_str = self.custom_order_entry.get().strip()
@@ -420,24 +456,33 @@ class GraphGUI:
         
         graph_copy2 = Graph(vertex_list2, edge_list2)
         self.tree = permutationToTreeDecomposition(graph_copy2, ordering2)
+        print("Tree Decomposition computed.")
+        print(self.tree)
         self.tree_decomposition = TreeDecomposition(self.tree.I, self.tree)
+        
+        # Update root selection combobox with bag labels
+        bag_labels = [bag.label for bag in self.tree_decomposition.tree.I.values()]
+        self.root_combo.configure(values=bag_labels)
+        if bag_labels:
+            self.root_var.set(bag_labels[0])
+            # Find the actual bag object by label
+            for vertex, bag in self.tree_decomposition.tree.I.items():
+                if bag.label == bag_labels[0]:
+                    self.root_bag = bag
+                    break
         
         self.draw_tree_decomposition()
     
-    def minimize_tree_decomposition(self):
-        if not self.tree_decomposition:
-            messagebox.showwarning("No Tree Decomposition", "Please compute a tree decomposition first")
-            return
-        
-        # Minimize the tree decomposition
-        self.tree_decomposition = minimize_TreeDecomposition(self.tree_decomposition)
-        
-        # Clear bag positions to force recalculation with new structure
-        self.bag_positions.clear()
-        
-        # Redraw the tree decomposition
-        self.draw_tree_decomposition()
-        
+    def on_root_changed(self, choice):
+        """Called when root selection combobox changes"""
+        if self.tree_decomposition and choice:
+            # Find the actual bag object by label
+            for vertex, bag in self.tree_decomposition.tree.I.items():
+                if bag.label == choice:
+                    self.root_bag = bag
+                    break
+            self.draw_tree_decomposition()
+    
     def draw_tree_decomposition(self):
         self.tree_canvas.delete("all")
         if not self.tree_decomposition:
@@ -452,15 +497,19 @@ class GraphGUI:
         # Initialize bag positions if needed
         if not self.bag_positions:
             n = len(bags)
-            radius = min(self.tree_canvas.winfo_width(), self.tree_canvas.winfo_height()) / 3
-            if radius == 0:
-                radius = 150
-            center_x = self.tree_canvas.winfo_width() / 2
-            center_y = self.tree_canvas.winfo_height() / 2
-            if center_x == 0:
-                center_x = 400
-            if center_y == 0:
-                center_y = 175
+            canvas_width = self.tree_canvas.winfo_width()
+            canvas_height = self.tree_canvas.winfo_height()
+            
+            # Use actual canvas size or fallback to reasonable defaults
+            if canvas_width <= 1:
+                canvas_width = 400
+            if canvas_height <= 1:
+                canvas_height = 350
+            
+            # Calculate radius and center
+            radius = min(canvas_width, canvas_height) / 3.5
+            center_x = canvas_width / 2
+            center_y = canvas_height / 2
             
             for i, (vertex, bag) in enumerate(bags.items()):
                 angle = 2 * math.pi * i / n
@@ -490,12 +539,23 @@ class GraphGUI:
             # Calculate size based on content
             r = max(35, len(content) * 4.5)
             
+            # Highlight root in different color
+            is_root = self.root_bag and bag.label == self.root_bag.label
+            if is_root:
+                shadow_color = "#ff6f00"  # Orange shadow for root
+                main_color = "#ffa726"     # Orange for root
+                outline_color = "#ffb74d"  # Light orange outline
+            else:
+                shadow_color = "#1b5e20"
+                main_color = "#2e7d32"
+                outline_color = "#66bb6a"
+            
             # Outer shadow
-            self.tree_canvas.create_oval(x-r-2, y-r-2, x+r+2, y+r+2, fill="#1b5e20", 
+            self.tree_canvas.create_oval(x-r-2, y-r-2, x+r+2, y+r+2, fill=shadow_color, 
                                          outline="", tags=f"bag_{bag.label}")
             # Main circle
-            self.tree_canvas.create_oval(x-r, y-r, x+r, y+r, fill="#2e7d32", 
-                                         outline="#66bb6a", width=2, tags=f"bag_{bag.label}")
+            self.tree_canvas.create_oval(x-r, y-r, x+r, y+r, fill=main_color, 
+                                         outline=outline_color, width=2, tags=f"bag_{bag.label}")
             # Text
             self.tree_canvas.create_text(x, y, text=content, font=("Segoe UI", 10, "bold"), 
                                         fill="white", tags=f"bag_{bag.label}")
@@ -522,6 +582,123 @@ class GraphGUI:
             
     def on_tree_release(self, event):
         self.dragging = None
+    
+    def convert_to_rooted_tree(self):
+        """Convert the current tree decomposition to a rooted tree and display it"""
+        if not self.tree_decomposition:
+            messagebox.showwarning("No Tree Decomposition", "Please compute a tree decomposition first")
+            return
+        
+        if not self.root_bag:
+            messagebox.showwarning("No Root Selected", "Please select a root bag from the dropdown")
+            return
+        
+        try:
+            tree = self.tree_decomposition.tree
+            
+            # Build rooted tree using the selected root
+            visited = set()
+            root_node = RootedTree.build_subtree(tree, self.root_bag, visited)
+            print("Rooted tree constructed successfully")
+            print(root_node)
+            # Create RootedTree object
+            self.rooted_tree = RootedTree(root_node, [])
+            self.node_positions.clear()
+            
+            # Draw the rooted tree
+            self.draw_rooted_tree()
+            messagebox.showinfo("Success", f"Tree decomposition converted to rooted tree with root '{self.root_bag.label}'")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error converting to rooted tree: {str(e)}")
+    
+    def draw_rooted_tree(self):
+        """Draw the rooted tree in hierarchical layout on the rooted tree canvas"""
+        self.rooted_canvas.delete("all")
+        if not self.rooted_tree:
+            return
+        
+        # Calculate hierarchical positions
+        self.node_positions.clear()
+        canvas_width = self.rooted_canvas.winfo_width()
+        if canvas_width <= 1:
+            canvas_width = 400
+        
+        self._calculate_node_positions(self.rooted_tree.root, 
+                                       x=canvas_width / 2,
+                                       y=30,
+                                       layer_height=70,
+                                       layer_width=150)
+        
+        # Draw edges (parent to children)
+        self._draw_node_edges(self.rooted_tree.root)
+        
+        # Draw nodes
+        self._draw_nodes(self.rooted_tree.root)
+    
+    def _calculate_node_positions(self, node, x, y, layer_height=80, layer_width=200):
+        """Calculate positions for nodes in a hierarchical tree layout"""
+        self.node_positions[node.label] = (x, y)
+        
+        if not node.children:
+            return
+        
+        # Calculate spacing for children
+        num_children = len(node.children)
+        total_width = (num_children - 1) * layer_width if num_children > 1 else 0
+        start_x = x - total_width / 2
+        
+        for i, child in enumerate(node.children):
+            child_x = start_x + i * layer_width
+            child_y = y + layer_height
+            self._calculate_node_positions(child, child_x, child_y, layer_height, layer_width)
+    
+    def _draw_node_edges(self, node):
+        """Draw edges from parent to children on rooted_canvas"""
+        if node.label in self.node_positions:
+            x1, y1 = self.node_positions[node.label]
+            
+            for child in node.children:
+                if child.label in self.node_positions:
+                    x2, y2 = self.node_positions[child.label]
+                    self.rooted_canvas.create_line(x1, y1, x2, y2, fill="#616161", width=3, smooth=True)
+                    self._draw_node_edges(child)
+    
+    def _draw_nodes(self, node):
+        """Recursively draw nodes with their labels on rooted_canvas"""
+        if node.label not in self.node_positions:
+            return
+        
+        x, y = self.node_positions[node.label]
+        r = 28
+        
+        # Check if this is the root node
+        is_root = self.rooted_tree and node.label == self.rooted_tree.root.label
+        
+        if is_root:
+            # Highlight root in orange/golden color
+            shadow_color = "#ff6f00"
+            main_color = "#ffa726"
+            outline_color = "#ffb74d"
+        else:
+            # Regular green color for other nodes
+            shadow_color = "#1b5e20"
+            main_color = "#2e7d32"
+            outline_color = "#66bb6a"
+        
+        # Outer shadow
+        self.rooted_canvas.create_oval(x-r-2, y-r-2, x+r+2, y+r+2, fill=shadow_color, 
+                                     outline="", tags=f"node_{node.label}")
+        # Main circle
+        self.rooted_canvas.create_oval(x-r, y-r, x+r, y+r, fill=main_color, 
+                                     outline=outline_color, width=2, tags=f"node_{node.label}")
+        # Text
+        self.rooted_canvas.create_text(x, y, text=node.label, font=("Segoe UI", 10, "bold"), 
+                                    fill="white", tags=f"node_{node.label}")
+        
+        # Recursively draw children
+        for child in node.children:
+            self._draw_nodes(child)
     
     def browse_file(self):
         """Open file dialog to select a graph file"""
