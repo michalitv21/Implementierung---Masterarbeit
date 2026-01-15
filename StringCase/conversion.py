@@ -59,8 +59,6 @@ def symb(char, i, alphabet, k):
         transitions={
             "p0": {x : "p1" if x[0] != char and x[i] == 1 else "p0" for x in new_alphabet}
         }
-
-
     )
 
 def sub(i, j, alphabet, k):
@@ -75,6 +73,11 @@ def sub(i, j, alphabet, k):
             "r0": {x : "r0" for x in new_alphabet if not (x[i] == 1 and x[j] == 0)} | {x : "r1" for x in new_alphabet if x[i] == 1 and x[j] == 0},
         }
     )
+
+
+
+
+
 
 if __name__ == "__main__":
     alphabet = {'a', 'b'}
@@ -94,22 +97,66 @@ if __name__ == "__main__":
     # Formula: ∀x∃y (P_a(x) -> (P_b(y) ∧ x ≤ y)) | Didint work
 
     singl1 = singl(1, alphabet, k)
-    print("Singl1 run: ", singl1.run([('a',1,0), ('b',0,1)]))
+    #print("Singl1 run: ", singl1.run([('a',1,0), ('b',0,1)]))
 
     singl2 = singl(2, alphabet, k)
-    print("Singl2 run: ", singl2.run([('a',1,0), ('b',0,1)]))
+    #print("Singl2 run: ", singl2.run([('a',1,0), ('b',0,1)]))
 
     PaX1 = symb('a', 1, alphabet, k)
-    print("PaX1 run: ", PaX1.run([('a',1,0), ('b',0,1)]))
-    print("Symb a transitions: ", PaX1.transitions)
+    #print("PaX1 run: ", PaX1.run([('a',1,0), ('b',0,1)]))
+    #print("Symb a transitions: ", PaX1.transitions)
 
     PbX2 = symb('b', 2, alphabet, k)
-    print("Symb b transitions: ", PbX2.transitions)
-    print("PbX2 run: ", PbX2.run([('a',1,0), ('b',0,1)]))
+    #print("Symb b transitions: ", PbX2.transitions)
+    #print("PbX2 run: ", PbX2.run([('a',1,0), ('b',0,1)]))
 
     le12 = le(1,2, alphabet, k)
-    print("le12 run: ", le12.run([('a',1,0), ('b',0,1)]))
+    #print("le12 run: ", le12.run([('a',1,0), ('b',0,1)]))
 
     final_automaton = (((PbX2.cut(le12)).cut(PaX1)).cut(singl2)).cut(singl1)
 
-    print(final_automaton.run([('a',1,0), ('b',1,1)]))  # Should be accepted
+    #print(final_automaton.run([('a',1,0), ('b',1,1)]))  # Should be accepted
+    #print(final_automaton.transitions)
+    #print(final_automaton.project(alphabet, k).transitions)
+
+    #∃x(P_a(x))
+    #aut = PaX1.cut(singl1) #Works!
+
+    #∃x∃y(P_a(x) ∧ P_b(y))
+    #aut = ((PbX2.cut(singl2)).cut(PaX1)).cut(singl1)
+
+    #∃x∃y(P_a(x) ∧ P_b(y) ∧ x ≤ y)
+    #exists(x,exists(y, and(P(a,x), and(P(b,y)), ≤(x, y)))))
+    #exists(singl(X1))
+
+    #aut = ((((PbX2.cut(le12)).cut(PaX1))).cut(singl2)).cut(singl1)
+
+    #∀x(P_a(x))
+    #∀X1(singl(X1) -> P_a(X1))
+    #¬∃X1(¬(singl(X1) -> P_a(X1)))
+    #¬∃X1(¬(¬singl(X1) ∨ P_a(X1)))
+    #¬∃X1(singl(X1) ∧ ¬P_a(X1))
+    print("Singl1 det: ",singl1.is_deterministic())
+    print(singl1.transitions)
+    print("PaX1 det: ",PaX1.is_deterministic())
+    print("Comp det: ",(PaX1.complement()).is_deterministic())
+    print("Singl1 cut Comp det: ",(singl1.cut(PaX1.complement())).is_deterministic())
+
+    aut = singl1.cut(PaX1.complement())
+    aut = aut.determinize()
+    print("Final aut det: ",aut.is_deterministic())
+    print(aut.accept_states)
+    projected = aut.project(alphabet, k)
+    det_proj_automaton = projected.determinize()
+    det_proj_automaton = det_proj_automaton.complement()
+    test_inputs = ["a","b", "aa", "ab", "ba", "bb", "aaa", "aab", "aba", "abb", "baa", "bab", "bba", "bbb", "aaaab", "ababa", "bbaba", "bbaaa"
+                "bbabb", "ababab","aaaaaaaaaaaaaaaaaaaaaaaaa"]
+    for test_input in test_inputs:
+        print(f"Input: {test_input}, Accepted: {det_proj_automaton.run(test_input)}")
+
+    #∃x∃y(P_a(x) ∧ P_b(y) ∧ x ≤ y)
+    #∃x∃y(singl(1, alphabet, k) ∧ singl(2, alphabet, k) ∧ P_a(x) ∧ P_b(y) ∧ x ≤ y)
+    #∃x∃y(and(singl(1, alphabet, k), and(singl(2, alphabet, k), and(symb('a',1, alphabet, k), and(symb('b',2, alphabet, k), le(1,2, alphabet, k))))))
+
+    #evaluate(exists(x,exists(y, and(P('a',x), and(P('b',y)), ≤(x, y))))), {x:1, y:2})]
+    #exists(and(singl(1, alphabet, k), and(singl(2, alphabet, k), and(symb('a',1, alphabet, k), and(symb('b',2, alphabet, k), le(1,2, alphabet, k))))))

@@ -1,4 +1,5 @@
 from utils import powerset
+import random
 
 class DFAState:
     def __init__(self, nfa_states):
@@ -21,14 +22,20 @@ class Automaton:
         if len(self.start_states) == 1:
             current_state = list(self.start_states)[0]
         else:
-            current_state = None
-        print("Running on input: " + str(input_string))
-        print("Start State: " + str(current_state))
+            current_state = random.choice(list(self.start_states))
+        #print("Running on input: " + str(input_string))
+        #print("Start State: " + str(current_state))
         for char in input_string:
-            print(current_state)
+            #print(current_state)
             if current_state in self.transitions and char in self.transitions[current_state]:
-                current_state = self.transitions[current_state][char]
-                print("Transition on '" + str(char) + "' to " + str(current_state))
+                if isinstance(self.transitions[current_state][char], list):
+                    #print("Nondeterministic transition found, picking random option.")
+                    current_state = random.choice(self.transitions[current_state][char])
+                else:
+                    current_state = self.transitions[current_state][char]
+                    
+                
+                #print("Transition on '" + str(char) + "' to " + str(current_state))
             else:
                 print("No transition for '" + str(char) + "' from state " + str(current_state))
                 return False
@@ -45,33 +52,108 @@ class Automaton:
                     return False
         return True
 
+    
     def determinize(self):
+        """
+        Convert NFA to DFA using powerset construction.
+        Uses frozensets to represent DFA states (sets of NFA states).
+        Includes progress monitoring and detailed console output.
+        """
+        print("\n" + "="*70)
+        print("STARTING DETERMINIZATION (Powerset Construction)")
+        print("="*70)
+        
+        # Step 1: Generate all possible subsets (powerset) of NFA states
+        print(f"\nStep 1: Generating powerset of {len(self.states)} NFA states...")
         elems = list(self.states)
         new_states = set()
+        
+        # Calculate total subsets for progress tracking
+        total_subsets = 2 ** len(elems)
+        print(f"  → Total possible subsets: {total_subsets}")
+        
+        subset_count = 0
         for subset in powerset(elems):
             new_states.add(frozenset(subset))
-        print("New States: " + str(new_states))
+            subset_count += 1
+            # Show progress every 10% or for small sets
+            if total_subsets <= 20 or subset_count % max(1, total_subsets // 10) == 0:
+                progress = (subset_count / total_subsets) * 100
+                bar_length = 30
+                filled = int(bar_length * subset_count / total_subsets)
+                bar = "█" * filled + "░" * (bar_length - filled)
+                print(f"\r  [{bar}] {progress:5.1f}% ({subset_count}/{total_subsets})                    ", end="", flush=True)
+        
+        print(f"\r  ✓ Generated {len(new_states)} DFA states (including empty set)                              ")
+        
+        # Step 2: Identify start states
+        print(f"\nStep 2: Setting initial DFA state...")
         new_start_states = {frozenset(self.start_states)}
+        print(f"  ✓ Initial state: {set(list(new_start_states)[0])}")
+        
+        # Step 3: Build transitions and identify accept states
+        print(f"\nStep 3: Building transition function...")
+        print(f"  Processing {len(new_states)} states × {len(self.alphabet)} symbols...")
+        
         new_accept_states = set()
         new_transitions = {}
+        state_count = 0
+        total_states = len(new_states)
+        
         for state in new_states:
-           new_transitions[state] = {}
-           for char in self.alphabet:
+            state_count += 1
+            
+            # Progress bar for state processing
+            progress = (state_count / total_states) * 100
+            bar_length = 30
+            filled = int(bar_length * state_count / total_states)
+            bar = "█" * filled + "░" * (bar_length - filled)
+            state_display = str(set(state))[:50] if state else '∅'
+            # Pad to 120 characters to ensure full line clearing
+            output = f"  [{bar}] {progress:5.1f}% ({state_count}/{total_states}) | Current: {state_display}"
+            print(f"\r{output:<120}", end="", flush=True)
+            
+            new_transitions[state] = {}
+            
+            # Process each alphabet symbol for this state
+            for char in self.alphabet:
                 next_states = set()
+                
+                # Collect all reachable states via char from any substate
                 for substate in state:
                     if substate in self.transitions and char in self.transitions[substate]:
                         next_state = self.transitions[substate][char]
+                        # Handle both single states and lists of states (for NFAs)
                         if isinstance(next_state, list):
                             for ns in next_state:
                                 next_states.add(ns)
                         else:
                             next_states.add(next_state)
+                
+                # Store transition as frozenset
                 new_transitions[state][char] = frozenset(next_states)
-                if any(substate in self.accept_states for substate in state):
-                    new_accept_states.add(state)
+            
+            # Check if this is an accept state (contains any NFA accept state)
+            if any(substate in self.accept_states for substate in state):
+                new_accept_states.add(state)
+        
+        print(f"\r  ✓ Transitions built for all {total_states} states                                        ")
+        
+        # Step 4: Summary
+        print(f"\nStep 4: Creating DFA...")
+        print(f"  ✓ Total DFA states: {len(new_states)}")
+        print(f"  ✓ Accept states: {len(new_accept_states)}")
+        print(f"  ✓ Transitions: {len(new_states)} states × {len(self.alphabet)} symbols")
+        
+        print("\n" + "="*70)
+        print("DETERMINIZATION COMPLETE!")
+        print("="*70 + "\n")
+        
         return Automaton(new_states, self.alphabet, new_start_states, new_accept_states, new_transitions)        
     
     def complement(self):
+        if not self.is_deterministic():
+            self = self.determinize()
         new_accept_states = self.states - self.accept_states
         return Automaton(self.states, self.alphabet, self.start_states, new_accept_states, self.transitions)
 
@@ -86,7 +168,15 @@ class Automaton:
             for char in self.alphabet.union(other.alphabet):
                 next_s1 = self.transitions.get(s1, {}).get(char, s1)
                 next_s2 = other.transitions.get(s2, {}).get(char, s2)
-                new_transitions[(s1, s2)][char] = (next_s1, next_s2)
+                if isinstance(next_s1, list) or isinstance(next_s2, list):
+                    # Handle nondeterministic transitions by adding to list
+                    combined_next_states = set()
+                    if isinstance(next_s1, list):
+                        combined_next_states.update(next_s1)
+                    if isinstance(next_s2, list):
+                        combined_next_states.update(next_s2)
+                    
+                else: new_transitions[(s1, s2)][char] = (next_s1, next_s2)
         
         return  Automaton(new_states, self.alphabet.union(other.alphabet), new_start_states, new_accept_states, new_transitions)
 
@@ -101,9 +191,34 @@ class Automaton:
             for char in self.alphabet.union(other.alphabet):
                 next_s1 = self.transitions.get(s1, {}).get(char, s1)
                 next_s2 = other.transitions.get(s2, {}).get(char, s2)
-                new_transitions[(s1, s2)][char] = (next_s1, next_s2)
+                if isinstance(next_s1, list) or isinstance(next_s2, list):
+                    # Handle nondeterministic transitions by adding to list
+                    combined_next_states = set()
+                    if isinstance(next_s1, list):
+                        combined_next_states.update(next_s1)
+                    if isinstance(next_s2, list):
+                        combined_next_states.update(next_s2)
+                
+                
+                else: new_transitions[(s1, s2)][char] = (next_s1, next_s2)
         
         return Automaton(new_states, self.alphabet.union(other.alphabet), new_start_states, new_accept_states, new_transitions)
+
+    def project(self, alphabet, k):
+        new_alphabet = alphabet
+        new_transitions = {}
+        for transition in self.transitions:
+            #print(transition)
+            #print(self.transitions[transition])
+            new_transitions[transition] = {}
+            for char in alphabet:
+                new_transitions[transition][char] = list()
+                for old_char in self.transitions[transition]:
+                    if old_char[0] == char:
+                        new_transitions[transition][char].append(self.transitions[transition][old_char])
+        return Automaton(self.states, new_alphabet, self.start_states, self.accept_states, new_transitions)
+
+                    
 
 if __name__ == "__main__":
     ab = Automaton(
@@ -113,7 +228,7 @@ if __name__ == "__main__":
         accept_states={"q1"},
         transitions={
             "q0": {"a": "q1",
-                   "b": "qf"},
+                   "b": ["q0", "qf"]},
             "q1": {"b": "q0",
                    "a": "qf"},
             "qf": {"a": "qf",
@@ -222,3 +337,16 @@ if __name__ == "__main__":
     for s in test_strings_det:
         result = det.run(s)
         print(f"Input: '{s}' => Accepted: {result}")
+
+
+    nfa2 = Automaton(
+        states={"p0", "p1", "pa", "pf"},
+        alphabet={"a"},
+        start_states={"p0", "p1"},
+        accept_states={"pa"},
+        transitions={
+            "p0": {"a": ["pa", "p1"]},
+            "p1": {"a": ["pa", "pf"]},
+        })
+    
+    nfa2.run("aa")
