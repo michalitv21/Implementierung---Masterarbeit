@@ -1,26 +1,5 @@
 from stringAutomata import Automaton
-
-
-def gen_new_alphabet(alphabet, k):
-    """
-    Docstring for gen_new_alphabet
-    
-    :param alphabet: Symbols that are used
-    :param k: Depth of Quantors
-
-    Example: gen_new_alphabet({'a','b'}, 2) -> {('a',0,0), ('a',0,1), ('a',1,0), ('a',1,1), ('b',0,0), ('b',0,1), ('b',1,0), ('b',1,1)}
-    """
-    
-    new_alphabet = set()
-    for symbol in alphabet:
-        def generate_tuples(current_tuple, depth):
-            if depth == k:
-                new_alphabet.add((symbol,) + current_tuple)
-                return
-            for i in range(2):
-                generate_tuples(current_tuple + (i,), depth + 1)
-        generate_tuples((), 0)
-    return new_alphabet
+from utils import gen_new_alphabet
 
 def singl(i, alphabet, k):
     new_alphabet = gen_new_alphabet(alphabet, k)
@@ -43,7 +22,7 @@ def le(i,j, alphabet, k):
         start_states={"s0"},
         accept_states={"s0","s1"},
         transitions={
-            "s0": {x : "s0" for x in new_alphabet if x[j] == 1} | {x : "s1" for x in new_alphabet if x[j] == 0},
+            "s0": {x : "s0" for x in new_alphabet if x[j] == 0} | {x : "s1" for x in new_alphabet if x[j] == 1},
             "s1": {x : "s1" for x in new_alphabet if x[i] == 0}
         }
     )
@@ -75,6 +54,46 @@ def sub(i, j, alphabet, k):
     )
 
 
+def build_in_automaton(set_idx, elem_idx, alphabet, k):
+        new_alphabet = gen_new_alphabet(alphabet, k)
+        
+        # Create automaton that rejects only when elem_idx=1 and set_idx=0
+        return Automaton(
+            states={"q0", "q1"},
+            alphabet=new_alphabet,
+            start_states={"q0"},
+            accept_states={"q0"},  # Accept in initial state
+            transitions={
+                "q0": {
+                    x: "q0" if not (x[elem_idx] == 1 and x[set_idx] == 0) else "q1"
+                    for x in new_alphabet
+                },
+                "q1": {x: "q1" for x in new_alphabet}  # Reject state (sink)
+            }
+        )
+
+
+def card_eq(set_idx_x, set_idx_y, alphabet, k):
+    """
+    Cardinality equality: |X| = |Y|
+    Implemented as: X and Y contain exactly the same positions
+    (This is sufficient for equal cardinality, though stronger)
+    """
+    new_alphabet = gen_new_alphabet(alphabet, k)
+    
+    return Automaton(
+        states={"q0", "q1"},
+        alphabet=new_alphabet,
+        start_states={"q0"},
+        accept_states={"q0"},  # Accept in initial state
+        transitions={
+            "q0": {
+                x: "q0" if x[set_idx_x] == x[set_idx_y] else "q1"
+                for x in new_alphabet
+            },
+            "q1": {x: "q1" for x in new_alphabet}  # Reject state
+        }
+    )
 
 
 

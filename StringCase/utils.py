@@ -18,5 +18,23 @@ if __name__ == "__main__":
         print(subset)
         
 
-
+def gen_new_alphabet(alphabet, k):
+    """
+    Docstring for gen_new_alphabet
     
+    :param alphabet: Symbols that are used
+    :param k: Depth of Quantors
+
+    Example: gen_new_alphabet({'a','b'}, 2) -> {('a',0,0), ('a',0,1), ('a',1,0), ('a',1,1), ('b',0,0), ('b',0,1), ('b',1,0), ('b',1,1)}
+    """
+    
+    new_alphabet = set()
+    for symbol in alphabet:
+        def generate_tuples(current_tuple, depth):
+            if depth == k:
+                new_alphabet.add((symbol,) + current_tuple)
+                return
+            for i in range(2):
+                generate_tuples(current_tuple + (i,), depth + 1)
+        generate_tuples((), 0)
+    return new_alphabet

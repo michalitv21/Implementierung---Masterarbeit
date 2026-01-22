@@ -1,13 +1,5 @@
-from utils import powerset
+from utils import powerset, gen_new_alphabet
 import random
-
-class DFAState:
-    def __init__(self, nfa_states):
-        self.states = frozenset(nfa_states)
-    def __hash__(self):
-        return hash(self.states)
-    def __eq__(self, other):
-        return self.states == other.states
 
 class Automaton:
     def __init__(self, states, alphabet, start_states, accept_states:set, transitions:dict):
@@ -16,6 +8,36 @@ class Automaton:
         self.start_states = start_states
         self.accept_states = accept_states if isinstance(accept_states, set) else set(accept_states)
         self.transitions = transitions  # dict of dicts: {state: {char: next_state}}
+
+    def nfa_run(self, input_string:str):
+        current_states = self.start_states
+        #print("Running on input: " + str(input_string))
+        #print("Start States: " + str(current_states))
+        for char in input_string:
+            #print("Current States: " + str(current_states))
+            next_states = set()
+            for state in current_states:
+                if state in self.transitions and char in self.transitions[state]:
+                    transition = self.transitions[state][char]
+                    if isinstance(transition, list):
+                        for t in transition:
+                            if isinstance(t, tuple) and len(t) > 0 and isinstance(t[-1], list):
+                                # Handle nested lists from cut operations
+                                for nested_t in t[-1]:
+                                    if isinstance(nested_t, (str, tuple)) and not isinstance(nested_t, list):
+                                        next_states.add(nested_t)
+                            elif isinstance(t, (str, tuple)) and not isinstance(t, list):
+                                next_states.add(t)
+                    elif isinstance(state, (str, tuple)) and not isinstance(state, list):
+                        next_states.add(transition)
+                    #print("Transition on '" + str(char) + "' from state " + str(state) + " to " + str(transition))
+                else:
+                    #print("No transition for '" + str(char) + "' from state " + str(state))
+                    pass
+            current_states = next_states
+            #print("Next States after input '" + str(char) + "': " + str(current_states))
+
+        return any(state in self.accept_states for state in current_states)
 
     def run(self, input_string:str):
         #print(len(self.start_states))
@@ -46,6 +68,11 @@ class Automaton:
         if len(self.start_states) != 1:
             return False
         for state in self.states:
+            for char in self.alphabet:
+                if isinstance(self.transitions[state][char], list):
+                    return False
+
+        for state in self.states:
             if state in self.transitions:
                 transitions_from_state = self.transitions[state]
                 if transitions_from_state.keys() != self.alphabet:
@@ -60,7 +87,7 @@ class Automaton:
         Includes progress monitoring and detailed console output.
         """
         print("\n" + "="*70)
-        print("STARTING DETERMINIZATION (Powerset Construction)")
+        #print("STARTING DETERMINIZATION (Powerset Construction) of", self.transitions)
         print("="*70)
         
         # Step 1: Generate all possible subsets (powerset) of NFA states
@@ -152,8 +179,12 @@ class Automaton:
         return Automaton(new_states, self.alphabet, new_start_states, new_accept_states, new_transitions)        
     
     def complement(self):
+        """
+        print("Deterministic?: " + str(self.is_deterministic()))
         if not self.is_deterministic():
             self = self.determinize()
+        """
+        self = self.determinize()
         new_accept_states = self.states - self.accept_states
         return Automaton(self.states, self.alphabet, self.start_states, new_accept_states, self.transitions)
 
@@ -181,6 +212,12 @@ class Automaton:
         return  Automaton(new_states, self.alphabet.union(other.alphabet), new_start_states, new_accept_states, new_transitions)
 
     def cut(self, other):
+
+        #print("\n In Cut Method: \n")
+        #print("Self Transitions: ", self.transitions)
+        #print("Other Transitions: ", other.transitions)
+        #print("\n End of Cut Method Print \n")
+
         new_states = {(s1, s2) for s1 in self.states for s2 in other.states}
         new_start_states = {(st1, st2) for st1 in self.start_states for st2 in other.start_states}
         new_accept_states = {(s1, s2) for s1 in self.states for s2 in other.states if s1 in self.accept_states and s2 in other.accept_states}
@@ -189,33 +226,96 @@ class Automaton:
         for (s1, s2) in new_states:
             new_transitions[(s1, s2)] = {}
             for char in self.alphabet.union(other.alphabet):
-                next_s1 = self.transitions.get(s1, {}).get(char, s1)
-                next_s2 = other.transitions.get(s2, {}).get(char, s2)
+                #print(f"Processiong transition for state ({s1}, {s2}) on char '{char}'")
+                next_s1 = self.transitions.get(s1, {}).get(char)
+                next_s2 = other.transitions.get(s2, {}).get(char)
+                # If either side has no transition, this symbol is not allowed from the pair.
+                if next_s1 is None or next_s2 is None:
+                    continue
+                #print(f"  Next states: {next_s1}, {next_s2}")
                 if isinstance(next_s1, list) or isinstance(next_s2, list):
                     # Handle nondeterministic transitions by adding to list
-                    combined_next_states = set()
-                    if isinstance(next_s1, list):
-                        combined_next_states.update(next_s1)
-                    if isinstance(next_s2, list):
-                        combined_next_states.update(next_s2)
+                    #print(" Two NFAs in cut. Check implementation!!!")
+                    combined_next_states = list()
+                    if (isinstance(next_s1, list) and isinstance(next_s2, list)):
+                        print(f"  Nondeterministic next states from both: {next_s1}, {next_s2}")
+                        for ns1 in next_s1:
+                            for ns2 in next_s2:
+                                combined_next_states.append((ns1, ns2))
+
+                    
+                    elif isinstance(next_s1, list):
+                        #print(f"  1. Nondeterministic next states from self: {next_s1}")
+                        for ns1 in next_s1:
+                            combined_next_states.append((ns1, next_s2))
+                    elif isinstance(next_s2, list):
+                        #print(f"  2. Nondeterministic next states from other: {next_s2}")  
+                        for ns2 in next_s2:
+                            combined_next_states.append((next_s1, ns2))
                 
-                
+                    #print(f"  Combined next states (nondeterministic): {combined_next_states}")
+                    new_transitions[(s1, s2)][char] = combined_next_states
                 else: new_transitions[(s1, s2)][char] = (next_s1, next_s2)
         
         return Automaton(new_states, self.alphabet.union(other.alphabet), new_start_states, new_accept_states, new_transitions)
 
-    def project(self, alphabet, k):
-        new_alphabet = alphabet
-        new_transitions = {}
-        for transition in self.transitions:
-            #print(transition)
-            #print(self.transitions[transition])
-            new_transitions[transition] = {}
-            for char in alphabet:
-                new_transitions[transition][char] = list()
-                for old_char in self.transitions[transition]:
-                    if old_char[0] == char:
-                        new_transitions[transition][char].append(self.transitions[transition][old_char])
+    def project(self, alphabet, j):
+        #print(f"Projecting automaton to alphabet with depth {j}...")
+        #print("Given transitions:", self.transitions)
+        if (j - 1 == 0): 
+            #print("In if case of projection.")
+            #print("Given alphabet:", alphabet)
+            new_alphabet = alphabet
+            new_transitions = {}
+            for transition in self.transitions:
+                #print("Transition:", transition)
+                #print(self.transitions[transition])
+                new_transitions[transition] = {}
+                for char in alphabet:
+                    #print("char:", char)
+                    new_transitions[transition][char] = list()
+                    #print("self.transitions: ", self.transitions)
+                    for old_char in self.transitions[transition]:
+                        #print("old char:", old_char)
+                        if old_char[0] == char:
+                            next_state = self.transitions[transition][old_char]
+                            if isinstance(next_state, list):
+                                new_transitions[transition][char].extend(next_state)
+                            else:
+                                new_transitions[transition][char].append(next_state)
+                    # Convert empty list to empty set (no transition)
+                    if not new_transitions[transition][char]:
+                        del new_transitions[transition][char]
+        else:
+            #print("In else case of projection.")
+            new_alphabet = gen_new_alphabet(alphabet, j - 1)
+            #print("New alphabet generated for projection.", new_alphabet)
+            new_transitions = {}
+            for transition in self.transitions:
+                #print(transition)
+                #print(self.transitions[transition])
+                new_transitions[transition] = {}
+                for char in new_alphabet:
+                    new_transitions[transition][char] = list()
+                    for old_char in self.transitions[transition]:
+                        #print("#################", old_char[0:j], char[0:j])
+                        if old_char[0:j] == char[0:j]:
+                            new_transition = (char[0],)
+                            for i in range(1, j+1):
+                                if i != j:
+                                    new_transition += (old_char[i],)
+                            next_state = self.transitions[transition][old_char]
+                            if new_transition not in new_transitions[transition]:
+                                new_transitions[transition][new_transition] = list()
+                            if isinstance(next_state, list):
+                                new_transitions[transition][new_transition].extend(next_state)
+                            else:
+                                new_transitions[transition][new_transition].append(next_state)
+                    # Clean up empty transitions
+                    keys_to_remove = [k for k in new_transitions[transition] if not new_transitions[transition][k]]
+                    for k in keys_to_remove:
+                        del new_transitions[transition][k]
+        #print("Projection complete. new transitions:", new_transitions)
         return Automaton(self.states, new_alphabet, self.start_states, self.accept_states, new_transitions)
 
                     
