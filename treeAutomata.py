@@ -12,62 +12,98 @@ class TreeAutomaton:
         self.input_symbols = input_symbols
         self.transitions = transitions
         self.final_states = final_states
-    #Trees Node must be ordered: children before parents
-    def evaluate(self, tree: RootedTree):
+    
+    # Tree must be ordered from leaves to root
+    def run(self, tree: RootedTree):
         state_dict = {}
         for node in tree.nodes:
-            print(state_dict)
-            if node.label in self.input_symbols:
+            if node.label in self.input_symbols.keys():
                 if node.is_leaf():
-                    key = (node.label,)
-                    possible_states = self.transitions.get(key, set())
-                    state_dict[node] = possible_states
+                    key = node.label
+                    state = self.transitions[key]
+                    state_dict[node] = state
+                elif self.input_symbols[node.label] == 1:
+                    child_states = [state_dict[child] for child in node.children]
+                    #print(transition_key)
+                    state_dict[node] = self.transitions[node.label][child_states[0]]
+                    #print(f"State dict[{node}]: ",state_dict[node])
                 else:
-                    child_states_lists = [state_dict[child] for child in node.children]
-                    possible_states = set()
-                    from itertools import product
-                    for child_states in product(*child_states_lists):
-                        print(child_states)
-                        key = (node.label,) + child_states
-                        print(key)
-                        possible_states.update(self.transitions.get(key, set()))
-                    state_dict[node] = possible_states
+                    child_states = [state_dict[child] for child in node.children]
+                    #print(transition_key)
+                    state_dict[node] = self.transitions[node.label][child_states[0]][child_states[1]]
+                    #print(f"State dict[{node}]: ",state_dict[node])
             else:
+                print(node.label, " not in input symbols!")
                 state_dict[node] = None
-        return state_dict
+        #print("State of root at end of run: ", state_dict[tree.root])
+        return state_dict[tree.root] in self.final_states
 
-if __name__ == "__main__":
-    node1 = Node("0",1, [])
-    node2 = Node("1", 2, [])
-    node3 = Node("0", 3, [])
-    node4 = Node("or", 4, [node1, node2])
-    node5 = Node("1", 5, [])
-    node6 = Node("not", 6, [node3])
-    node7 = Node("not", 7, [node4])
-    node8 = Node("or", 8, [node5, node6])
-    node9 = Node("and", 9, [node7, node8])
+    
+    def complement(self):
+        new_final_states = self.states - self.final_states
+        return TreeAutomaton(
+            states=self.states,
+            input_symbols=self.input_symbols,
+            final_states=new_final_states,
+            transitions=self.transitions
+        )
+    
+    def union(self, other):
+        new_states = {(s1, s2) for s1 in self.states for s2 in other.states}
+        #print(new_states)
+        new_final_states = {(s1, s2) for s1 in self.states for s2 in other.states if s1 in self.final_states or s2 in other.final_states}
+        #print(new_final_states)
+        new_transitions = {}
+        
+        for char in self.input_symbols.keys():  # Assuming both automata have the same input symbols
+            new_transitions[char] = {}
+            if self.input_symbols[char] == 0:
+                new_transitions[char] = (self.transitions[char], other.transitions[char])
+            elif self.input_symbols[char] == 1:
+                pass
+            else:
+                new_transitions[char] = {}
+                for (s1, s2) in new_states:
+                    new_transitions[char][(s1, s2)] = {}
+                    for (t1, t2) in new_states:
+                        next_s1 = self.transitions[char][s1][t1]
+                        next_s2 = other.transitions[char][s2][t2]
+                        new_transitions[char][(s1, s2)][(t1, t2)] = (next_s1, next_s2)
+        #print(new_transitions)
+        return TreeAutomaton(
+            states=new_states,
+            input_symbols=self.input_symbols,
+            final_states=new_final_states,
+            transitions=new_transitions
+        )  
 
-    automaton = TreeAutomaton(
-        states={"q0", "q1"},
-        input_symbols={"0", "1", "and", "or", "not"},
-        transitions={
-            ("0",): {"q0"},
-            ("1",): {"q1"},
-            ("or", "q0", "q0"): {"q0"},
-            ("or", "q0", "q1"): {"q1"},
-            ("or", "q1", "q0"): {"q1"},
-            ("or", "q1", "q1"): {"q1"},
-            ("and", "q0", "q0"): {"q0"},
-            ("and", "q0", "q1"): {"q0"},
-            ("and", "q1", "q0"): {"q0"},
-            ("and", "q1", "q1"): {"q1"},
-            ("not", "q0"): {"q1"},
-            ("not", "q1"): {"q0"},
-        },
-        final_states={"q1"}
-    )
+    def cut(self, other):
+        new_states = {(s1, s2) for s1 in self.states for s2 in other.states}
+        #print(new_states)
+        new_final_states = {(s1, s2) for s1 in self.states for s2 in other.states if s1 in self.final_states and s2 in other.final_states}
+        #print(new_final_states)
+        new_transitions = {}
+        
+        for char in self.input_symbols.keys():  # Assuming both automata have the same input symbols
+            new_transitions[char] = {}
+            if self.input_symbols[char] == 0:
+                new_transitions[char] = (self.transitions[char], other.transitions[char])
+            elif self.input_symbols[char] == 1:
+                pass
+            else:
+                new_transitions[char] = {}
+                for (s1, s2) in new_states:
+                    new_transitions[char][(s1, s2)] = {}
+                    for (t1, t2) in new_states:
+                        next_s1 = self.transitions[char][s1][t1]
+                        next_s2 = other.transitions[char][s2][t2]
+                        new_transitions[char][(s1, s2)][(t1, t2)] = (next_s1, next_s2)
+        #print(new_transitions)
+        return TreeAutomaton(
+            states=new_states,
+            input_symbols=self.input_symbols,
+            final_states=new_final_states,
+            transitions=new_transitions
+        )  
 
-    print(RootedTree(node9, [node1, node2, node3, node4, node5, node6, node7, node8, node9]))
-    result_states = automaton.evaluate(RootedTree(node9, [node1, node2, node3, node4, node5, node6, node7, node8, node9]))
-    print("Possible states at root:", result_states[ node9 ])
     
