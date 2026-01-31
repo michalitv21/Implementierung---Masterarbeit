@@ -6,11 +6,15 @@ t1n1 = Node("leaf", 1, [])
 t1n2 = Node("leaf", 2, [])
 t1n3 = Node("leaf", 3, [])
 t1n4 = Node("leaf", 4, [])
-t1n5 = Node("a", 5, [t1n1, t1n2])
-t1n6 = Node("b", 6, [t1n3, t1n4])
-t1n7 = Node("b", 7, [t1n5, t1n6])
+t1n5 = Node("leaf", 5, [])
+t1n6 = Node("leaf", 6, [])
+t1n7 = Node("b", 7, [t1n1, t1n2])
+t1n8 = Node("b", 8, [t1n3, t1n4])
+t1n9 = Node("b", 9, [t1n7, t1n8])
+t1n10 = Node("a", 10, [t1n5, t1n6])
+t1n11 = Node("a", 11, [t1n9, t1n10])
 
-t1 = RootedTree(t1n7, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7])
+t1 = RootedTree(t1n11, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7, t1n8, t1n9, t1n10, t1n11])
 
 # Automaton that accepts trees with even number of 'a' leaves
 even_a = TreeAutomaton(
@@ -19,23 +23,23 @@ even_a = TreeAutomaton(
         "a":2, "b":2, "leaf":0},  
     final_states={"q_even"},
     transitions={
-        "leaf" : "q_even",
+        "leaf" : ["q_even"],
 
         
             "a": 
             {"q_even": 
-                {"q_even": "q_odd", "q_odd": "q_even"}, #left child state
+                {"q_even": ["q_odd"], "q_odd": ["q_even"]}, #left child state
              "q_odd": 
-                {"q_even": "q_even", "q_odd": "q_odd"}
+                {"q_even": ["q_even"], "q_odd": ["q_odd"]}
             }, #right child state
         
 
         
             "b": 
             {"q_even": 
-                {"q_even": "q_even", "q_odd": "q_odd"}, #left child state
+                {"q_even": ["q_even"], "q_odd": ["q_odd"]}, #left child state
              "q_odd": 
-                {"q_even": "q_odd", "q_odd": "q_even"}}, #right child state
+                {"q_even": ["q_odd"], "q_odd": ["q_even"]}}, #right child state
         
     }
 )
@@ -47,23 +51,23 @@ even_b = TreeAutomaton(
         "a":2, "b":2, "leaf":0},  
     final_states={"q_even"},
     transitions={
-        "leaf": "q_even",
+        "leaf": ["q_even"],
 
         
             "a":
             {"q_even": 
-                {"q_even": "q_even", "q_odd": "q_odd"}, #left child state
+                {"q_even": ["q_even"], "q_odd": ["q_odd"]}, #left child state
              "q_odd": 
-                {"q_even": "q_odd", "q_odd": "q_even"}
+                {"q_even": ["q_odd"], "q_odd": ["q_even"]}
             }, #right child state
         
 
         
             "b":
             {"q_even": 
-                {"q_even": "q_odd", "q_odd": "q_even"}, #left child state
+                {"q_even": ["q_odd"], "q_odd": ["q_even"]}, #left child state - flips parity
              "q_odd": 
-                {"q_even": "q_even", "q_odd": "q_odd"}}, #right child state
+                {"q_even": ["q_even"], "q_odd": ["q_odd"]}}, #right child state - flips parity
         
     }    
 )
