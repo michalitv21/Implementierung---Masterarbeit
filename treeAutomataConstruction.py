@@ -109,6 +109,43 @@ def left(i, j, alphabet, k):
         } | {char: "l0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
+def right(i, j, alphabet, k):
+    new_alphabet = gen_new_alphabet(alphabet, k)
+    return TreeAutomaton(
+        states={"r0", "r1", "r2", "r3"},
+        input_symbols={char:alphabet[char[0]] for char in new_alphabet},
+        final_states={"r3"},
+        transitions={
+            char: 
+            {
+                "r0": {
+                    "r0": "r2" if char[j] == 1 and char[i] == 0 else "r0" if char[j] == 0 and char[i] == 0 else "r1",
+                    "r1": "r1",
+                    "r2": "r3" if char[i] == 0 and char[j] == 1 else "r1",
+                    "r3": "r3" if char[j] == 0 and char[i] == 0 else "r1",
+                },
+                "r1": {
+                    "r0": "r1",
+                    "r1": "r1",
+                    "r2": "r1",
+                    "r3": "r1"
+                },
+                "r2": {
+                    "r0": "r1",
+                    "r1": "r1",
+                    "r2": "r1",
+                    "r3": "r1"
+                },
+                "r3": {
+                    "r0": "r3" if char[j] == 0 and char[i] == 0 else "r1",
+                    "r1": "r1",
+                    "r2": "r1",
+                    "r3": "r1"
+                }
+            } for char in new_alphabet if alphabet[char[0]] != 0
+        } | {char: "r0" for char in new_alphabet if alphabet[char[0]] == 0}
+    )
+
 if __name__ == "__main__":
     alphabet = {
         "a":2, "b":2, "leaf":0
