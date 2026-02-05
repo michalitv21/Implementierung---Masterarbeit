@@ -1,3 +1,4 @@
+from collections import deque
 from utils import powerset, gen_new_alphabet
 import random
 
@@ -11,31 +12,24 @@ class Automaton:
 
     def nfa_run(self, input_string:str):
         current_states = self.start_states
-        #print("Running on input: " + str(input_string))
-        #print("Start States: " + str(current_states))
         for char in input_string:
-            #print("Current States: " + str(current_states))
             next_states = set()
             for state in current_states:
                 if state in self.transitions and char in self.transitions[state]:
-                    transition = self.transitions[state][char]
-                    if isinstance(transition, list):
-                        for t in transition:
-                            if isinstance(t, tuple) and len(t) > 0 and isinstance(t[-1], list):
-                                # Handle nested lists from cut operations
-                                for nested_t in t[-1]:
-                                    if isinstance(nested_t, (str, tuple)) and not isinstance(nested_t, list):
-                                        next_states.add(nested_t)
-                            elif isinstance(t, (str, tuple)) and not isinstance(t, list):
-                                next_states.add(t)
-                    elif isinstance(state, (str, tuple)) and not isinstance(state, list):
-                        next_states.add(transition)
-                    #print("Transition on '" + str(char) + "' from state " + str(state) + " to " + str(transition))
-                else:
-                    #print("No transition for '" + str(char) + "' from state " + str(state))
-                    pass
+                    next_state = self.transitions[state][char]
+                    # Handle different types of next_state
+                    if isinstance(next_state, list):
+                        for ns in next_state:
+                            next_states.add(ns)
+                    elif isinstance(next_state, frozenset):
+                        # This is a determinized state - add it as a single state
+                        next_states.add(next_state)
+                    else:
+                        next_states.add(next_state)
+            
             current_states = next_states
-            #print("Next States after input '" + str(char) + "': " + str(current_states))
+            if not current_states:
+                return False
 
         return any(state in self.accept_states for state in current_states)
 
@@ -178,14 +172,50 @@ class Automaton:
         print("="*70 + "\n")
         
         return Automaton(new_states, self.alphabet, new_start_states, new_accept_states, new_transitions)        
-    
+
+    def determinize_reachable(self):
+        new_start_state = frozenset(self.start_states)
+        new_transitions = {}
+        reachable_states = set()
+        queue = deque([new_start_state])
+        
+        while queue:
+            state = queue.popleft()
+            if state in reachable_states:
+                continue
+                
+            reachable_states.add(state)
+            new_transitions[state] = {}
+            
+            for char in self.alphabet:
+                next_states = set()
+                for substate in state:
+                    if substate in self.transitions and char in self.transitions[substate]:
+                        next_state = self.transitions[substate][char]
+                        if isinstance(next_state, list):
+                            for ns in next_state:
+                                next_states.add(ns)
+                        else:
+                            next_states.add(next_state)
+                
+                next_state_frozen = frozenset(next_states)
+                new_transitions[state][char] = next_state_frozen
+                
+                # KEY FIX: Add even empty states to queue and reachable_states
+                # This ensures we explore all reachable states including dead states
+                if next_state_frozen not in reachable_states and next_state_frozen not in queue:
+                    queue.append(next_state_frozen)
+        
+        new_accept_states = {state for state in reachable_states if any(substate in self.accept_states for substate in state)}
+        return Automaton(reachable_states, self.alphabet, {new_start_state}, new_accept_states, new_transitions)
+
     def complement(self):
         """
         print("Deterministic?: " + str(self.is_deterministic()))
         if not self.is_deterministic():
             self = self.determinize()
         """
-        self = self.determinize()
+        self = self.determinize_reachable()
         new_accept_states = self.states - self.accept_states
         return Automaton(self.states, self.alphabet, self.start_states, new_accept_states, self.transitions)
 

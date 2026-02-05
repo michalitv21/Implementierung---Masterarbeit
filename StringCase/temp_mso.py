@@ -95,10 +95,6 @@ class MSO_Parser:
                 inner = formula[4:-1]  # Remove 'and(' and ')'
                 left, right = self._split_at_comma(inner)
                 #print(f"and with left: {left}, right: {right}")
-                print("In and:")
-                print("left AST transitions: ", self.build_ast(left))
-                print("right AST transitions: ", self.build_ast(right))
-
                 return {
                     'type': 'and',
                     'left': self.build_ast(left),
@@ -237,9 +233,7 @@ class MSO_Parser:
         elif ast['type'] == 'and':
             left_automaton = self.build_automaton(ast['left'])
             right_automaton = self.build_automaton(ast['right'])
-            print("-----------")
             print("Cut automaton: ", left_automaton.cut(right_automaton).transitions)
-            print("-----------")
             return left_automaton.cut(right_automaton)
         
         elif ast['type'] == 'or':
@@ -265,8 +259,6 @@ class MSO_Parser:
             symbol = ast['symbol']
             var = ast['var']
             var_idx = self.bound_variables.get(var)
-            print("predicate transitions: ", symb(symbol, var_idx, self.alphabet, self.k).transitions)
-            print("predicate alphabet: ", symb(symbol, var_idx, self.alphabet, self.k).alphabet)
             return symb(symbol, var_idx, self.alphabet, self.k)
 
         elif ast['type'] == 'card_eq':
@@ -276,13 +268,11 @@ class MSO_Parser:
             right_idx = self.bound_variables.get(right_var)
             return card_eq(left_idx, right_idx, self.alphabet, self.k)
 
-def count_quantors(formula):
-        return formula.count('∃') + formula.count('∀')
-
 if __name__ == "__main__":
     alphabet = {'a', 'b'}
-    
-    #formula = "∃x(∃y(and(le(x,y),and(P_a(x),P_b(y)))))"
+    k = 4
+    parser = MSO_Parser(alphabet, k)
+    formula = "∃x(∃y(and(le(x,y),and(P_a(x),P_b(y)))))"
     #formula = "∃x(not(∃y(and(P_a(x),and(P_a(y),le(x,y))))))"
     #formula = "∃x(∃y(∃z(and(and(P_a(x),P_a(y)),and(le(y, z), P_b(z))))))"
     #formula = "∀x(∃y(->(P_a(x),and(P_b(y),le(x,y)))))"
@@ -293,9 +283,8 @@ if __name__ == "__main__":
     #formula = "∃x(∃y(∃z(and(and(le(x,y),le(y,z)),and(P_a(x),and(P_b(y),P_a(z)))))))"
     # |a| = |b|
     #formula = "∃X(∃Y(∀x(∀y( and( <->(P_a(x),in(X,x)) , and( <->(P_b(y),in(Y,y)) , card_eq(X,Y) ) ) ))))"
-    formula = "∀x(P_a(x))"
+    #formula = "∀x(P_a(x))"
     
-    parser = MSO_Parser(alphabet, count_quantors(formula))
     ast = parser.build_ast(formula)
     print(ast)
     print(parser.bound_variables)

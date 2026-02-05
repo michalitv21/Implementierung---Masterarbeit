@@ -17,13 +17,14 @@ def singl(i, alphabet, k):
 def le(i,j, alphabet, k):
     new_alphabet = gen_new_alphabet(alphabet, k)
     return Automaton(
-        states={"s0", "s1"},
+        states={"s0", "s1", "s_reject"},
         alphabet=new_alphabet,
         start_states={"s0"},
         accept_states={"s0","s1"},
         transitions={
             "s0": {x : "s0" for x in new_alphabet if x[j] == 0} | {x : "s1" for x in new_alphabet if x[j] == 1},
-            "s1": {x : "s1" for x in new_alphabet if x[i] == 0}
+            "s1": {x : "s1" for x in new_alphabet if x[i] == 0} | {x : "s_reject" for x in new_alphabet if x[i] == 1},
+            "s_reject": {x : "s_reject" for x in new_alphabet}
         }
     )
 
