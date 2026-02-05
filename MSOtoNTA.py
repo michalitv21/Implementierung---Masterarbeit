@@ -279,7 +279,7 @@ if __name__ == "__main__":
     parser = MSO_to_NTA_Parser(alphabet, k)
 
     #formula = "∃x(∃y(and(P_a(x),and(P_b(y),left(x,y)))))"
-    formula = "∀x(∃y(->(P_b(x),and(P_a(y),left(x,y)))))"
+    formula = "∀x(∃y(->(P_b(x),and(P_a(y),left(y,x)))))"
     #formula = "∃x(∃y(and(and(P_b(x),P_c(y)),left(y,x))))"
     
     ast = parser.build_ast(formula)
