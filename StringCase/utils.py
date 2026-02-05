@@ -11,11 +11,6 @@ def powerset(elems):
                 results.append(elems[j])
         yield results
 
-
-if __name__ == "__main__":
-    elems = list({"q0", "q1", "qf"})
-    for subset in powerset(elems):
-        print(subset)
         
 
 def gen_new_alphabet(alphabet, k):
@@ -38,3 +33,10 @@ def gen_new_alphabet(alphabet, k):
                 generate_tuples(current_tuple + (i,), depth + 1)
         generate_tuples((), 0)
     return new_alphabet
+
+
+
+if __name__ == "__main__":
+    elems = list({"q0", "q1", "qf"})
+    for subset in powerset(elems):
+        print(subset)

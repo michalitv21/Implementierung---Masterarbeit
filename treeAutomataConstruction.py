@@ -3,6 +3,7 @@ from StringCase.utils import gen_new_alphabet
 from treeDecomp import Node, RootedTree
 
 def singl(i, alphabet, k):
+    print("Constructing singl automaton for position ", i)
     new_alphabet = gen_new_alphabet(alphabet, k)
     return TreeAutomaton(
         states={"s0", "s1", "s2"},
@@ -31,6 +32,7 @@ def singl(i, alphabet, k):
     )
 
 def sub(i, j, alphabet, k):
+    print("Constructing sub automaton for positions ", i, " and ", j)
     new_alphabet = gen_new_alphabet(alphabet, k)
     return TreeAutomaton(
         states={"t0", "t1"},
@@ -52,6 +54,7 @@ def sub(i, j, alphabet, k):
     )
 
 def symb(symbol, i, alphabet, k):
+    print("Constructing symb automaton for symbol ", symbol, " at position ", i)
     new_alphabet = gen_new_alphabet(alphabet, k)
     return TreeAutomaton(
         states={"p0", "p1"},
@@ -73,6 +76,7 @@ def symb(symbol, i, alphabet, k):
     )
 
 def left(i, j, alphabet, k):
+    print("Constructing left automaton for positions ", i, " and ", j)
     new_alphabet = gen_new_alphabet(alphabet, k)
     return TreeAutomaton(
         states={"l0", "l1", "l2", "l3"},
@@ -110,6 +114,7 @@ def left(i, j, alphabet, k):
     )
 
 def right(i, j, alphabet, k):
+    print("Constructing right automaton for positions ", i, " and ", j)
     new_alphabet = gen_new_alphabet(alphabet, k)
     return TreeAutomaton(
         states={"r0", "r1", "r2", "r3"},
@@ -145,40 +150,3 @@ def right(i, j, alphabet, k):
             } for char in new_alphabet if alphabet[char[0]] != 0
         } | {char: "r0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
-
-if __name__ == "__main__":
-    alphabet = {
-        "a":2, "b":2, "leaf":0
-        }
-    #print(gen_new_alphabet(alphabet, 2))
-    s = singl(1, alphabet, 2)
-    sub_a = sub(1,2, alphabet, 2)
-    #print(s.input_symbols)
-    #print(s.transitions)
-
-    symb_a_1 = symb("a", 1, alphabet, 2)
-    symb_leaf_2 = symb("leaf", 2, alphabet, 2)
-    left_1_2 = left(1,2, alphabet, 2)
-
-
-    t1n1 = Node(("leaf", 0, 0), 1, [])
-    t1n2 = Node(("leaf", 0, 0), 2, [])
-    t1n3 = Node(("leaf", 0, 0), 3, [])
-    t1n4 = Node(("leaf", 0, 0), 4, [])
-    t1n5 = Node(("leaf", 0, 0), 5, [])
-    t1n6 = Node(("leaf", 0, 0), 6, [])
-    t1n7 = Node(("b", 1, 0), 7, [t1n1, t1n2])
-    t1n8 = Node(("b", 0, 0), 8, [t1n3, t1n4])
-    t1n9 = Node(("b", 0, 1), 9, [t1n7, t1n8])
-    t1n10 = Node(("a", 0, 0), 10, [t1n5, t1n6])
-    t1n11 = Node(("a", 0, 0), 11, [t1n9, t1n10])
-
-    tree = RootedTree(t1n11, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7, t1n8, t1n9, t1n10, t1n11])
-
-    #s = singl(1, alphabet, 2)
-    
-
-
-    #print(symb_a_1.run(tree))
-    #print(symb_leaf_2.run(tree))
-    print(left_1_2.run(tree))

@@ -44,6 +44,7 @@ class Automaton:
         if len(self.start_states) == 1:
             current_state = list(self.start_states)[0]
         else:
+            #print("Nondeterministic start states, picking random start state.")
             current_state = random.choice(list(self.start_states))
         #print("Running on input: " + str(input_string))
         #print("Start State: " + str(current_state))
@@ -87,7 +88,7 @@ class Automaton:
         Includes progress monitoring and detailed console output.
         """
         print("\n" + "="*70)
-        #print("STARTING DETERMINIZATION (Powerset Construction) of", self.transitions)
+        print("STARTING DETERMINIZATION (Powerset Construction) of", self.transitions)
         print("="*70)
         
         # Step 1: Generate all possible subsets (powerset) of NFA states
