@@ -1,5 +1,5 @@
 import re
-from conversion import card_eq, singl, le, symb, sub, build_in_automaton, Automaton
+from conversion import card_eq, even_set, singl, le, symb, sub, build_in_automaton, Automaton
 from stringAutomata import Automaton as StringAutomaton
 
 class MSO_Parser:
@@ -80,6 +80,13 @@ class MSO_Parser:
                     'left': left,
                     'right': right
                 }
+        elif formula.startswith('even_set(') and formula.endswith(')'):
+                inner = formula[9:-1]  # Remove 'even_set(' and ')'
+                set_var = inner.strip()
+                return {
+                    'type': 'even_set',
+                    'set_var': set_var
+                }
         elif formula.startswith('not'):
             if formula.startswith('not(') and formula.endswith(')'):
                 subformula = formula[4:-1].strip()  # Remove 'not(' and ')'
@@ -95,9 +102,9 @@ class MSO_Parser:
                 inner = formula[4:-1]  # Remove 'and(' and ')'
                 left, right = self._split_at_comma(inner)
                 #print(f"and with left: {left}, right: {right}")
-                print("In and:")
-                print("left AST transitions: ", self.build_ast(left))
-                print("right AST transitions: ", self.build_ast(right))
+                #print("In and:")
+                #print("left AST transitions: ", self.build_ast(left))
+                #print("right AST transitions: ", self.build_ast(right))
 
                 return {
                     'type': 'and',
@@ -174,6 +181,7 @@ class MSO_Parser:
                         'right': self.build_ast(left)
                     }
                 }
+            
         raise ValueError(f"Unrecognized formula: {formula}")
     
     def build_automaton(self, ast):
@@ -275,6 +283,11 @@ class MSO_Parser:
             left_idx = self.bound_variables.get(left_var)
             right_idx = self.bound_variables.get(right_var)
             return card_eq(left_idx, right_idx, self.alphabet, self.k)
+        
+        elif ast['type'] == 'even_set':
+            set_var = ast['set_var']
+            set_idx = self.bound_variables[set_var]
+            return even_set(set_idx, self.alphabet, self.k)
 
 def count_quantors(formula):
         return formula.count('∃') + formula.count('∀')
@@ -291,10 +304,12 @@ if __name__ == "__main__":
     #formula = "∃x(∀Z(->(and(P_c(x),in(Z,x))))"
     #formula = "∃X(∃Y(∃x(∃y(∃z(and(and(in(X,x),in(Y,y)),and(and(in(X,x),le(x,y)),le(y,z))))))))"
     #formula = "∃x(∃y(∃z(and(and(le(x,y),le(y,z)),and(P_a(x),and(P_b(y),P_a(z)))))))"
-    # |a| = |b|
+    # |a| = |b| not in MSO...
     #formula = "∃X(∃Y(∀x(∀y( and( <->(P_a(x),in(X,x)) , and( <->(P_b(y),in(Y,y)) , card_eq(X,Y) ) ) ))))"
-    formula = "∀x(P_a(x))"
-    
+    #formula = "∀x(P_a(x))"    
+    formula = "∃X(∀x(and(<->(P_a(x),in(X,x)),even_set(X))))" #Even number of a's
+    formula = "∃X(∃Y(∀x(∀y(and(  and(<->(P_a(x),in(X,x)),even_set(X))  ,  and(<->(P_b(y),in(Y,y)),even_set(Y))  )))))" #Even b's and a's
+
     parser = MSO_Parser(alphabet, count_quantors(formula))
     ast = parser.build_ast(formula)
     print(ast)

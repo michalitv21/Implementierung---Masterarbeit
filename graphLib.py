@@ -183,5 +183,5 @@ if __name__ == "__main__":
     print("Before nice:")
     print(treeDecomp)
     print("After nice:")
-    make_nice_decomposition(treeDecomp)
+    #make_nice_decomposition(treeDecomp)
     print(treeDecomp)

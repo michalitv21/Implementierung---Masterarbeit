@@ -12,22 +12,29 @@ def singl(i, alphabet, k):
         transitions={
             char: 
             {
-                "s0": {
+                "s0": { #no '1' at position i yet in left branch
                     "s0": "s0" if char[i] == 0 else "s1",
                     "s1": "s1" if char[i] == 0 else "s2",
                     "s2": "s2",
                 },
-                "s1": {
+                "s1": { # '1' at position i in left branch, so we need to make sure we don't get another '1' at position i in right branch
                     "s0": "s1" if char[i] == 0 else "s2",
                     "s1": "s2",
                     "s2": "s2",
                 },
-                "s2": {
+                "s2": { # Capture State
                     "s0": "s2",
                     "s1": "s2",
                     "s2": "s2",
                 }
-            } for char in new_alphabet if alphabet[char[0]] != 0
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | {
+            char: 
+            {
+                "s0": "s0" if char[i] == 0 else "s1",
+                "s1": "s1" if char[i] == 0 else "s2",
+                "s2": "s2",
+            } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "s0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
@@ -41,15 +48,21 @@ def sub(i, j, alphabet, k):
         transitions={
             char: 
             {
-                "t1": {
+                "t1": { # Rejection State
                     "t0": "t1",
                     "t1": "t1",
                 },
-                "t0": {
+                "t0": { # Accepting State
                     "t0": "t1" if char[i] == 1 and char[j] == 0 else "t0",
                     "t1": "t1",
                 }
-            } for char in new_alphabet if alphabet [char[0]] != 0
+            } for char in new_alphabet if alphabet [char[0]] == 2
+        } | {
+            char:
+                {
+                    "t1": "t1",
+                    "t0": "t1" if char[i] == 1 and char[j] == 0 else "t0",
+                } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "t0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
@@ -63,15 +76,21 @@ def symb(symbol, i, alphabet, k):
         transitions={
             char: 
             {
-                 "p1": {
+                 "p1": { # Rejectiong State
                     "p0": "p1",
                     "p1": "p1",
                 },
-                "p0": {
+                "p0": { # Accepting State
                     "p0": "p1" if (not (char[0] == symbol)) and char[i] == 1 else "p0",
                     "p1": "p1",
                 }
-            } for char in new_alphabet if alphabet[char[0]] != 0
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | {
+            char: 
+                {
+                    "p1": "p1",
+                    "p0": "p1" if (not (char[0] == symbol)) and char[i] == 1 else "p0",
+                } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "p0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
@@ -109,7 +128,15 @@ def left(i, j, alphabet, k):
                     "l2": "l1",
                     "l3": "l1"
                 }
-            } for char in new_alphabet if alphabet[char[0]] != 0
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | { # I assume in unary symbols we do not need to worry about left and right child since we only have one child, so we propagate the state to the top
+            char:
+                {
+                    "l0": "l0",
+                    "l1": "l1",
+                    "l2": "l2",
+                    "l3": "l3",
+                } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "l0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
@@ -147,6 +174,14 @@ def right(i, j, alphabet, k):
                     "r2": "r1",
                     "r3": "r1"
                 }
-            } for char in new_alphabet if alphabet[char[0]] != 0
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | {
+                char:
+                    {
+                        "r0": "r0",
+                        "r1": "r1",
+                        "r2": "r2",
+                        "r3": "r3",
+                    } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "r0" for char in new_alphabet if alphabet[char[0]] == 0}
     )

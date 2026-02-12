@@ -83,24 +83,7 @@ class TreeAutomaton:
         for node in tree.nodes:
             if node.label in self.input_symbols.keys():
                 state = self.transitions[node.label]
-                #print("Processing node: ", node)
-                #print("Transition state (of char already): ", state)
-                if self.input_symbols[node.label] > 0:
-                    child_states = [state_dict[child] for child in node.children]
-                    #print("Child states: ", child_states)
-                    for i in range(len(child_states)-1):
-                        #print("Child States i ", child_states[i])
-                        state = state[child_states[i]]
-                    # Get final transition result
-                    result = state[child_states[-1]]
-                    # Handle nondeterministic transitions (list of states) vs deterministic (single state)
-                    if isinstance(result, list):
-                        print("Nondeterministic transition found, picking random option.")
-                        state_dict[node] = random.choice(result)
-                    else:
-                        # Single state (could be a simple state or a tuple from union/cut)
-                        state_dict[node] = result
-                else:
+                if self.input_symbols[node.label] == 0:
                     # Leaf node: state is either a single state or a tuple from union/cut
                     if isinstance(state, list):
                         print("Nondeterministic transition found, picking random option.")
@@ -108,6 +91,28 @@ class TreeAutomaton:
                     else:
                         state_dict[node] = state
 
+                elif self.input_symbols[node.label] == 1:
+                    child_state = state_dict[node.children[0]]
+                    if isinstance(child_state, list):
+                        print("Nondeterministic child states found, picking random option.")
+                        child_state = random.choice(child_state)    
+                    state_dict[node] = state[child_state]
+
+                elif self.input_symbols[node.label] == 2:
+                    #print("Children : ", node.children)
+                    child_state_0 = state_dict[node.children[0]]
+                    child_state_1 = state_dict[node.children[1]]
+                    #print("Child states: ", child_state_0, child_state_1)
+                    if isinstance(child_state_0, list):
+                        print("Nondeterministic child states found, picking random option.")
+                        child_state_0 = random.choice(child_state_0)
+                    if isinstance(child_state_1, list):
+                        print("Nondeterministic child states found, picking random option.")
+                        child_state_1 = random.choice(child_state_1)
+                    state_dict[node] = state[child_state_0][child_state_1]
+                    
+                else:
+                    print("Higher arity nodes not implemented yet")
         
         # Check if any of the possible states at the root is an accepting state
         root_states = state_dict[tree.root]
@@ -327,9 +332,12 @@ class TreeAutomaton:
         last_update = time.time()
         last_state_count = len(reachable_states)
         
-        unary_symbols = [(symbol, arity) for symbol, arity in self.input_symbols.items() if arity == 1]
+        unary_symbols = [symbol for symbol, arity in self.input_symbols.items() if arity == 1]
         binary_symbols = [symbol for symbol, arity in self.input_symbols.items() if arity == 2]
         
+        print("Binary symbols: ", binary_symbols)
+        print("Unary symbols: ", unary_symbols)
+
         print(f"  Processing {len(unary_symbols)} unary and {len(binary_symbols)} binary symbols")
         
         while queue:
@@ -347,10 +355,12 @@ class TreeAutomaton:
             # Process unary transitions
             for symbol in unary_symbols:
                 if symbol not in new_transitions:
+                    print("Symbol not in new_transitions, initializing: ", symbol)
                     new_transitions[symbol] = {}
                 
                 if current_state not in new_transitions[symbol]:
                     resulting_states = set()
+                    print("Current state: ", current_state)
                     for nta_state in current_state:
                         if nta_state in self.transitions[symbol]:
                             result = self.transitions[symbol][nta_state]
@@ -456,11 +466,8 @@ class TreeAutomaton:
             new_transitions[char] = {}
             if self.input_symbols[char] == 0:
                 # Handle leaf transitions - combine states from both automata
-                trans1 = self.transitions[char]
-                trans2 = other.transitions[char]
-                # Extract states from lists if present (nondeterministic case)
-                states1 = trans1 if not isinstance(trans1, list) else trans1
-                states2 = trans2 if not isinstance(trans2, list) else trans2
+                states1 = self.transitions[char]
+                states2 = other.transitions[char]
                 # Create list of combined states
                 combined = []
                 if isinstance(states1, list) and isinstance(states2, list):
@@ -477,7 +484,29 @@ class TreeAutomaton:
                     combined.append((states1, states2))
                 new_transitions[char] = combined if len(combined) > 1 else combined[0] if combined else None
             elif self.input_symbols[char] == 1:
-                pass
+                 # Handle unary transitions
+                new_transitions[char] = {}
+                for (s1, s2) in new_states:
+                    new_transitions[char][(s1, s2)] = {}
+                    child_s1 = self.transitions[char][s1]
+                    child_s2 = other.transitions[char][s2]
+
+                    combined = []
+                    if isinstance(child_s1, list) and isinstance(child_s2, list):
+                        for cs1 in child_s1:
+                            for cs2 in child_s2:
+                                combined.append((cs1, cs2))
+                    elif isinstance(child_s1, list):
+                        for cs1 in child_s1:
+                            combined.append((cs1, child_s2))
+                    elif isinstance(child_s2, list):
+                        for cs2 in child_s2:
+                            combined.append((child_s1, cs2))
+                    else:
+                        combined.append((child_s1, child_s2))
+                    
+                    new_transitions[char][(s1, s2)] = combined if len(combined) > 1 else combined[0] if combined else None
+                
             else:
                 new_transitions[char] = {}
                 for (s1, s2) in new_states:
@@ -537,7 +566,31 @@ class TreeAutomaton:
                     combined.append((states1, states2))
                 new_transitions[char] = combined if len(combined) > 1 else combined[0] if combined else None
             elif self.input_symbols[char] == 1:
-                pass
+                 # Handle unary transitions
+                new_transitions[char] = {}
+                for (s1, s2) in new_states:
+                    new_transitions[char][(s1, s2)] = {}
+                    child_s1 = self.transitions[char][s1]
+                    child_s2 = other.transitions[char][s2]
+
+                    combined = []
+                    if isinstance(child_s1, list) and isinstance(child_s2, list):
+                        for cs1 in child_s1:
+                            for cs2 in child_s2:
+                                combined.append((cs1, cs2))
+                    elif isinstance(child_s1, list):
+                        for cs1 in child_s1:
+                            combined.append((cs1, child_s2))
+                    elif isinstance(child_s2, list):
+                        for cs2 in child_s2:
+                            combined.append((child_s1, cs2))
+                    else:
+                        combined.append((child_s1, child_s2))
+                    
+                    new_transitions[char][(s1, s2)] = combined if len(combined) > 1 else combined[0] if combined else None
+                
+
+
             else:
                 new_transitions[char] = {}
                 for (s1, s2) in new_states:
@@ -664,6 +717,7 @@ class TreeAutomaton:
             elif arity == 1:
                 # Unary transitions
                 new_transitions[new_char] = {}
+                print("New char: ", new_char)
                 if verbose:
                     print(f"    Building unary transitions...")
                 for state in self.states:

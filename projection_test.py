@@ -4,6 +4,7 @@ alphabet = {
     "a":2,
     "b":2,
     "c":2,
+    "d":1,
     "x":0,
     "y":0
 }
@@ -22,7 +23,9 @@ t1n11 = Node("a", 11, [t1n5, t1n6])
 t1n12 = Node("c", 12, [t1n7, t1n8])
 t1n13 = Node("b", 13, [t1n9, t1n10])
 t1n14 = Node("b", 14, [t1n11, t1n12])
-t1n15 = Node("a", 15, [t1n13, t1n14])
+t1n15 = Node("d", 15, [t1n13])
+t1n16 = Node("d", 16, [t1n14])
+t1n17 = Node("a", 17, [t1n15, t1n16])
 
 t2n1 = Node("x", 1, [])
 t2n2 = Node("x", 2, [])
@@ -38,11 +41,13 @@ t2n11 = Node("a", 11, [t2n5, t2n6])
 t2n12 = Node("c", 12, [t2n7, t2n8])
 t2n13 = Node("a", 13, [t2n9, t2n10])
 t2n14 = Node("b", 14, [t2n11, t2n12])
-t2n15 = Node("a", 15, [t2n13, t2n14])
+t2n15 = Node("d", 15, [t2n13])
+t2n16 = Node("d", 16, [t2n14])
+t2n17 = Node("a", 17, [t2n15, t2n16])
 
-tree1 = RootedTree(t1n15, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7, t1n8, t1n9, t1n10, t1n11, t1n12, t1n13, t1n14, t1n15])
+tree1 = RootedTree(t1n17, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7, t1n8, t1n9, t1n10, t1n11, t1n12, t1n13, t1n14, t1n15, t1n16, t1n17])
 
-tree2 = RootedTree(t2n15, [t2n1, t2n2, t2n3, t2n4, t2n5, t2n6, t2n7, t2n8, t2n9, t2n10, t2n11, t2n12, t2n13, t2n14, t2n15])
+tree2 = RootedTree(t2n17, [t2n1, t2n2, t2n3, t2n4, t2n5, t2n6, t2n7, t2n8, t2n9, t2n10, t2n11, t2n12, t2n13, t2n14, t2n15, t2n16, t2n17])
 
 symb_a_1 = symb("a", 1, alphabet, 2)
 symb_b_2 = symb("b", 2, alphabet, 2)
@@ -55,7 +60,7 @@ right_21 = right(2,1, alphabet, 2)
 
 #final_automaton = singl1.cut(singl2).cut((symb_a_1.cut(symb_b_2).cut(left_21)).union(symb_c_1.cut(symb_y_2).cut(right_21))).project(alphabet, 2).project(alphabet, 1)
 
-final_automaton = final_automaton = singl1.cut(singl2).cut((symb_a_1.cut(symb_b_2)).cut(left_21).union(symb_c_1)).project(alphabet, 2).project(alphabet, 1)
+final_automaton = singl1.cut(singl2).cut((symb_a_1.cut(symb_b_2)).cut(left_21).union(symb_c_1)).project(alphabet, 2).project(alphabet, 1)
 
 print("One Path: " + str(final_automaton.run(tree1)))  # Should be accepted sometimes
 print("One Path 2: " + str(final_automaton.run(tree2)))  # Should be accepted sometimes

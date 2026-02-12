@@ -73,7 +73,7 @@ def build_in_automaton(set_idx, elem_idx, alphabet, k):
             }
         )
 
-
+# WROOOONG! |a|=|b| is not definable in mso
 def card_eq(set_idx_x, set_idx_y, alphabet, k):
     """
     Cardinality equality: |X| = |Y|
@@ -96,7 +96,25 @@ def card_eq(set_idx_x, set_idx_y, alphabet, k):
         }
     )
 
-
+def even_set(set_idx, alphabet, k):
+    new_alphabet = gen_new_alphabet(alphabet, k)
+    
+    return Automaton(
+        states={"q0", "q1"},
+        alphabet=new_alphabet,
+        start_states={"q0"},
+        accept_states={"q0"},  # Accept in initial state
+        transitions={
+            "q0": {
+                x: "q1" if x[set_idx] == 1 else "q0"
+                for x in new_alphabet
+            },
+            "q1": {
+                x: "q0" if x[set_idx] == 1 else "q1"
+                for x in new_alphabet
+            }
+        }
+    )
 
 
 if __name__ == "__main__":

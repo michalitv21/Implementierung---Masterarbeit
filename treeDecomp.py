@@ -107,15 +107,15 @@ class NiceTree(RootedTree):
         super().__init__(root, nodes)
 
 if __name__ == "__main__":
-    node1 = Node("0", [])
-    node2 = Node("1", [])
-    node3 = Node("0", [])
-    node4 = Node("or", [node1, node2])
-    node5 = Node("1", [])
-    node6 = Node("not", [node3])
-    node7 = Node("not", [node4])
-    node8 = Node("or", [node5, node6])
-    node9 = Node("and", [node7, node8])
+    node1 = Node("0", 1, [])
+    node2 = Node("1", 2, [])
+    node3 = Node("0", 3, [])
+    node4 = Node("or", 4, [node1, node2])
+    node5 = Node("1", 5, [])
+    node6 = Node("not", 6, [node3])
+    node7 = Node("not", 7, [node4])
+    node8 = Node("or", 8, [node5, node6])
+    node9 = Node("and", 9, [node7, node8])
 
     print(RootedTree(node9, [node1, node2, node3, node4, node5, node6, node7, node8, node9]))
     
