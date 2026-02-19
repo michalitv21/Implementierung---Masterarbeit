@@ -4,7 +4,7 @@ from tkinter import messagebox, filedialog
 import math
 import json
 import os
-from graphLib import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition
+from graphLib import Graph, Vertex, minimal_degree_ordering, permutationToTreeDecomposition, tree_to_rooted_tree, make_binary_tree
 from treeDecomp import TreeDecomposition, RootedTree, Node
 from graph_loader import load_graph_from_adjacency_list, load_graph_from_edge_list
 
@@ -27,6 +27,7 @@ class GraphGUI:
         self.graph = None
         self.tree_decomposition = None
         self.rooted_tree = None  # RootedTree representation
+        self.binary_tree = None  # Binary tree representation
         self.root_bag = None  # Selected root bag for rooted tree
         self.saved_graphs = {}  # name -> (vertices, edges)
         
@@ -123,6 +124,7 @@ class GraphGUI:
         viz_frame.grid(row=0, column=1, columnspan=2, rowspan=2, sticky="nsew", padx=(0, 15))
         viz_frame.columnconfigure(0, weight=1)
         viz_frame.columnconfigure(1, weight=1)
+        viz_frame.columnconfigure(2, weight=1)
         viz_frame.rowconfigure(0, weight=1)
         viz_frame.rowconfigure(1, weight=1)
         
@@ -142,7 +144,7 @@ class GraphGUI:
         
         # Tree decomposition canvas
         tree_frame = ctk.CTkFrame(viz_frame, corner_radius=15)
-        tree_frame.grid(row=1, column=0, sticky="nsew")
+        tree_frame.grid(row=0, column=1, columnspan=2, sticky="nsew")
         tree_frame.columnconfigure(0, weight=1)
         tree_frame.rowconfigure(1, weight=1)
         
@@ -158,6 +160,8 @@ class GraphGUI:
         self.root_combo.pack(side="left", padx=5)
         ctk.CTkButton(tree_header_frame, text="Rooted", command=self.convert_to_rooted_tree, 
                      width=70, fg_color="#1565c0", hover_color="#0d47a1").pack(side="left", padx=5)
+        ctk.CTkButton(tree_header_frame, text="Binary", command=self.convert_to_binary_tree, 
+                     width=70, fg_color="#c62828", hover_color="#ad1457").pack(side="left", padx=2)
         
         self.tree_canvas = ctk.CTkCanvas(tree_frame, bg="#1a1a1a", width=400, height=350, highlightthickness=0)
         self.tree_canvas.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
@@ -167,7 +171,7 @@ class GraphGUI:
         
         # Rooted tree canvas
         rooted_frame = ctk.CTkFrame(viz_frame, corner_radius=15)
-        rooted_frame.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
+        rooted_frame.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
         rooted_frame.columnconfigure(0, weight=1)
         rooted_frame.rowconfigure(1, weight=1)
         
@@ -175,6 +179,17 @@ class GraphGUI:
         
         self.rooted_canvas = ctk.CTkCanvas(rooted_frame, bg="#1a1a1a", width=400, height=350, highlightthickness=0)
         self.rooted_canvas.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
+        
+        # Binary tree canvas
+        binary_frame = ctk.CTkFrame(viz_frame, corner_radius=15)
+        binary_frame.grid(row=1, column=1, sticky="nsew", padx=(10, 0))
+        binary_frame.columnconfigure(0, weight=1)
+        binary_frame.rowconfigure(1, weight=1)
+        
+        ctk.CTkLabel(binary_frame, text="Binary Tree", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=15, pady=(15, 10))
+        
+        self.binary_canvas = ctk.CTkCanvas(binary_frame, bg="#1a1a1a", width=400, height=350, highlightthickness=0)
+        self.binary_canvas.grid(row=1, column=0, sticky="nsew", padx=15, pady=(0, 15))
         
         # Right panel - Save/Load
         save_load_frame = ctk.CTkFrame(main_frame, corner_radius=15)
@@ -311,9 +326,12 @@ class GraphGUI:
         self.node_positions.clear()
         self.tree_decomposition = None
         self.rooted_tree = None
+        self.binary_tree = None
         self.update_lists()
         self.draw_graph()
         self.tree_canvas.delete("all")
+        self.rooted_canvas.delete("all")
+        self.binary_canvas.delete("all")
         
     def update_lists(self):
         self.vertex_list.delete("1.0", "end")
@@ -594,19 +612,15 @@ class GraphGUI:
             return
         
         try:
-            tree = self.tree_decomposition.tree
-            
-            # Build rooted tree using the selected root
-            visited = set()
-            root_node = RootedTree.build_subtree(tree, self.root_bag, visited)
-            print("Rooted tree constructed successfully")
-            print(root_node)
-            # Create RootedTree object
-            self.rooted_tree = RootedTree(root_node, [])
+            # Use the graphLib tree_to_rooted_tree function
+            self.rooted_tree = tree_to_rooted_tree(self.tree_decomposition.tree, self.root_bag)
+            print("Rooted tree converted successfully")
             self.node_positions.clear()
             
             # Draw the rooted tree
             self.draw_rooted_tree()
+            self.binary_canvas.delete("all")  # Clear binary tree when creating new rooted tree
+            self.binary_tree = None
             messagebox.showinfo("Success", f"Tree decomposition converted to rooted tree with root '{self.root_bag.label}'")
             
         except Exception as e:
@@ -699,6 +713,154 @@ class GraphGUI:
         # Recursively draw children
         for child in node.children:
             self._draw_nodes(child)
+    
+    def _create_binary_compatible_tree(self, rooted_tree):
+        """Create a copy of the rooted tree with string labels for binary tree conversion"""
+        node_map = {}
+        
+        def clone_node(node):
+            if node in node_map:
+                return node_map[node]
+            
+            # Convert label to string
+            new_label = str(node.label)
+            new_node = Node(new_label, node.id, [])
+            node_map[node] = new_node
+            
+            # Clone children
+            for child in node.children:
+                child_clone = clone_node(child)
+                new_node.add_child(child_clone)
+            
+            return new_node
+        
+        root_clone = clone_node(rooted_tree.root)
+        return RootedTree(root_clone, [])
+    
+    def convert_to_binary_tree(self):
+        """Convert the current rooted tree to a binary tree"""
+        if not self.rooted_tree:
+            messagebox.showwarning("No Rooted Tree", "Please create a rooted tree first")
+            return
+        
+        try:
+            # Create a binary-compatible version with string labels
+            binary_compatible_tree = self._create_binary_compatible_tree(self.rooted_tree)
+            
+            # Use graphLib make_binary_tree function
+            self.binary_tree = make_binary_tree(binary_compatible_tree)
+            print("Binary tree created successfully")
+            self.node_positions.clear()
+            
+            # Draw the binary tree
+            self.draw_binary_tree()
+            messagebox.showinfo("Success", "Rooted tree converted to binary tree successfully")
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Error converting to binary tree: {str(e)}")
+    
+    def draw_binary_tree(self):
+        """Draw the binary tree in hierarchical layout on the binary tree canvas"""
+        self.binary_canvas.delete("all")
+        if not self.binary_tree:
+            return
+        
+        # Calculate hierarchical positions
+        self.node_positions.clear()
+        canvas_width = self.binary_canvas.winfo_width()
+        if canvas_width <= 1:
+            canvas_width = 400
+        
+        leaf_count = self._count_binary_leaves(self.binary_tree.root)
+        unit = max(60, min(140, int(canvas_width / (leaf_count + 1))))
+        start_x = max(40, (canvas_width - (leaf_count - 1) * unit) / 2)
+        self._assign_binary_positions(self.binary_tree.root, depth=0, start_x=start_x, unit=unit, layer_height=70)
+        
+        # Draw edges (parent to children)
+        self._draw_binary_node_edges(self.binary_tree.root)
+        
+        # Draw nodes
+        self._draw_binary_nodes(self.binary_tree.root)
+    
+    def _count_binary_leaves(self, node):
+        if not node.children:
+            return 1
+        return sum(self._count_binary_leaves(child) for child in node.children)
+
+    def _assign_binary_positions(self, node, depth, start_x, unit, layer_height=80):
+        node_key = f"binary_{node.id}"
+        y = 30 + depth * layer_height
+        
+        if not node.children:
+            self.node_positions[node_key] = (start_x, y)
+            return start_x + unit
+        
+        if len(node.children) == 1:
+            next_x = self._assign_binary_positions(node.children[0], depth + 1, start_x, unit, layer_height)
+            child_key = f"binary_{node.children[0].id}"
+            child_x = self.node_positions[child_key][0]
+            self.node_positions[node_key] = (child_x, y)
+            return next_x
+        
+        next_x = self._assign_binary_positions(node.children[0], depth + 1, start_x, unit, layer_height)
+        next_x = self._assign_binary_positions(node.children[1], depth + 1, next_x, unit, layer_height)
+        left_key = f"binary_{node.children[0].id}"
+        right_key = f"binary_{node.children[1].id}"
+        left_x = self.node_positions[left_key][0]
+        right_x = self.node_positions[right_key][0]
+        self.node_positions[node_key] = ((left_x + right_x) / 2, y)
+        return next_x
+    
+    def _draw_binary_node_edges(self, node):
+        """Draw edges from parent to children on binary_canvas"""
+        node_key = f"binary_{node.id}"
+        if node_key in self.node_positions:
+            x1, y1 = self.node_positions[node_key]
+            
+            for child in node.children:
+                child_key = f"binary_{child.id}"
+                if child_key in self.node_positions:
+                    x2, y2 = self.node_positions[child_key]
+                    self.binary_canvas.create_line(x1, y1, x2, y2, fill="#616161", width=3, smooth=True)
+                    self._draw_binary_node_edges(child)
+    
+    def _draw_binary_nodes(self, node):
+        """Recursively draw nodes with their labels on binary_canvas"""
+        node_key = f"binary_{node.id}"
+        if node_key not in self.node_positions:
+            return
+        
+        x, y = self.node_positions[node_key]
+        r = 28
+        
+        # Check if this is a join node (contains "join" in label)
+        is_join = "join" in node.label.lower()
+        
+        if is_join:
+            # Join nodes in purple
+            shadow_color = "#4a148c"
+            main_color = "#7b1fa2"
+            outline_color = "#9c27b0"
+        else:
+            # Regular nodes in green
+            shadow_color = "#1b5e20"
+            main_color = "#2e7d32"
+            outline_color = "#66bb6a"
+        
+        # Outer shadow
+        self.binary_canvas.create_oval(x-r-2, y-r-2, x+r+2, y+r+2, fill=shadow_color, 
+                          outline="", tags=f"binary_node_{node.id}")
+        # Main circle
+        self.binary_canvas.create_oval(x-r, y-r, x+r, y+r, fill=main_color, 
+                          outline=outline_color, width=2, tags=f"binary_node_{node.id}")
+        # Text - use a shortened label if too long
+        label_text = str(node.label)[:10]  # Limit label length
+        self.binary_canvas.create_text(x, y, text=label_text, font=("Segoe UI", 9, "bold"), 
+                          fill="white", tags=f"binary_node_{node.id}")
+        
+        # Recursively draw children
+        for child in node.children:
+            self._draw_binary_nodes(child)
     
     def browse_file(self):
         """Open file dialog to select a graph file"""

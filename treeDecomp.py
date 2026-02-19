@@ -1,12 +1,15 @@
 
 class Bag:
-    def __init__(self, label:str, vertices:set):
+    def __init__(self, label, vertices:set):
         self.label = label
         self.vertices = vertices if isinstance(vertices, set) else set(vertices)
         
         
     def add_vertex(self, v):
         self.vertices.add(v)
+
+    def __str__(self):
+        return str(self.vertices)
 
     def __repr__(self):
         return str(self.vertices)
@@ -60,7 +63,7 @@ class Node():
         self.children = children
 
     def __str__(self):
-        return (self.label + "(" + ", ".join([str(c) for c in self.children]) + ")")
+        return (str(self.label) + "(" + ", ".join([str(c) for c in self.children]) + ")")
         #label is Bag then we need the label of the bag
 
     def add_child(self, child:Node):
@@ -72,7 +75,18 @@ class Node():
     def is_leaf(self):
         return len(self.children) == 0
 
-
+    def parent(self, root):
+        # Find the parent of this node in the tree rooted at root
+        if self == root:
+            return None
+        worklist = [root]
+        while worklist:
+            current = worklist.pop()
+            for child in current.children:
+                if child == self:
+                    return current
+                worklist.append(child)
+        return None
 
 class RootedTree():
     def __init__(self, root:Node, nodes):
@@ -91,9 +105,12 @@ class RootedTree():
     def set_root(self, root:Node):
         self.root = root
     
+    def add_edge(self, parent:Node, child:Node):
+        parent.add_child(child)
+
     def build_subtree(tree:Tree, bag:Bag, visited:set):
         visited.add(bag)
-        node = Node(bag, [])
+        node = Node(bag,1, [])
         for edge in tree.F:
             if bag in edge:
                 other_bag = (edge - set([bag])).pop()
@@ -102,9 +119,14 @@ class RootedTree():
                     node.add_child(child_node)
         return node
 
-class NiceTree(RootedTree):
+class BinaryTree(RootedTree):
     def __init__(self, root:Node, nodes):
         super().__init__(root, nodes)
+
+class RootedBinaryDecomposition(TreeDecomposition):
+    def __init__(self, bags:Node, tree, ):
+        super().__init__(bags, tree)
+
 
 if __name__ == "__main__":
     node1 = Node("0", 1, [])

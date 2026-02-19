@@ -35,7 +35,7 @@ def singl(i, alphabet, k):
                 "s1": "s1" if char[i] == 0 else "s2",
                 "s2": "s2",
             } for char in new_alphabet if alphabet[char[0]] == 1
-        } | {char: "s0" for char in new_alphabet if alphabet[char[0]] == 0}
+        } | {char: "s0" if char[i] == 0 else "s1" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
 def sub(i, j, alphabet, k):
@@ -81,7 +81,7 @@ def symb(symbol, i, alphabet, k):
                     "p1": "p1",
                 },
                 "p0": { # Accepting State
-                    "p0": "p1" if (not (char[0] == symbol)) and char[i] == 1 else "p0",
+                    "p0": "p1" if (char[0] != symbol) and char[i] == 1 else "p0",
                     "p1": "p1",
                 }
             } for char in new_alphabet if alphabet[char[0]] == 2
@@ -89,9 +89,9 @@ def symb(symbol, i, alphabet, k):
             char: 
                 {
                     "p1": "p1",
-                    "p0": "p1" if (not (char[0] == symbol)) and char[i] == 1 else "p0",
+                    "p0": "p1" if (char[0] != symbol) and char[i] == 1 else "p0",
                 } for char in new_alphabet if alphabet[char[0]] == 1
-        } | {char: "p0" for char in new_alphabet if alphabet[char[0]] == 0}
+        } | {char: "p1" if (char[0] != symbol) and char[i] == 1 else "p0" for char in new_alphabet if alphabet[char[0]] == 0}
     )
 
 def left(i, j, alphabet, k):
@@ -184,4 +184,62 @@ def right(i, j, alphabet, k):
                         "r3": "r3",
                     } for char in new_alphabet if alphabet[char[0]] == 1
         } | {char: "r0" for char in new_alphabet if alphabet[char[0]] == 0}
+    )
+
+def in_Set(set_idx, elem_idx, alphabet, k):
+    print("Constructing in_Set automaton for set index ", set_idx, " and element index ", elem_idx)
+    new_alphabet = gen_new_alphabet(alphabet, k)
+    return TreeAutomaton(
+        states={"i0", "i1"},
+        input_symbols={char:alphabet[char[0]] for char in new_alphabet},
+        final_states={"i0"},
+        transitions={
+            char: 
+            {
+                "i0": {
+                    "i0": "i0" if not (char[elem_idx] == 1 and char[set_idx] == 0) else "i1",
+                    "i1": "i1",
+                },
+                "i1": {
+                    "i0": "i1",
+                    "i1": "i1",
+                }
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | {
+            char:
+                {
+                    "i0": "i0" if not (char[elem_idx] == 1 and char[set_idx] == 0) else "i1",
+                    "i1": "i1",
+                } for char in new_alphabet if alphabet[char[0]] == 1
+        } | {char: 
+             "i0" if not (char[elem_idx] == 1 and char[set_idx] == 0) else "i1" for char in new_alphabet if alphabet[char[0]] == 0}
+
+    )
+
+def even(i, alphabet, k):
+    print("Constructing even automaton for position ", i)
+    new_alphabet = gen_new_alphabet(alphabet, k)
+    return TreeAutomaton(
+        states={"e0", "e1"},
+        input_symbols={char:alphabet[char[0]] for char in new_alphabet},
+        final_states={"e0"},
+        transitions={
+            char: 
+            {
+                "e0": {
+                    "e0": "e0" if char[i] == 0 else "e1",
+                    "e1": "e1" if char[i] == 0 else "e0",
+                },
+                "e1": {
+                    "e0": "e1" if char[i] == 0 else "e0",
+                    "e1": "e0" if char[i] == 0 else "e1",
+                }
+            } for char in new_alphabet if alphabet[char[0]] == 2
+        } | {
+            char:
+                {
+                    "e0": "e0" if char[i] == 0 else "e1",
+                    "e1": "e1" if char[i] == 0 else "e0",
+                } for char in new_alphabet if alphabet[char[0]] == 1
+        } | {char: "e0" if char[i] == 0 else "e1" for char in new_alphabet if alphabet[char[0]] == 0}
     )

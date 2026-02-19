@@ -1,4 +1,4 @@
-from treeAutomataConstruction import singl, left, right, sub, symb
+from treeAutomataConstruction import even, in_Set, singl, left, right, sub, symb
 from treeAutomata import *
 import re
 
@@ -120,8 +120,7 @@ class MSO_to_NTA_Parser:
                     'left': self.build_ast(left),
                     'right': self.build_ast(right)
                 }
-        elif formula.startswith('in'):
-            if formula.startswith('in(') and formula.endswith(')'):
+        elif formula.startswith('in(') and formula.endswith(')'):
                 inner = formula[3:-1].strip()
                 set_var, elem_var = self._split_at_comma(inner)
                 return {
@@ -158,6 +157,13 @@ class MSO_to_NTA_Parser:
                         'right': self.build_ast(left)
                     }
                 }
+        elif formula.startswith('even(') and formula.endswith(')'):
+            inner = formula[5:-1].strip()
+            var = inner
+            return {
+                'type': 'even',
+                'var': var
+            }
         raise ValueError(f"Unrecognized formula: {formula}")
     
     def build_automaton(self, ast):
@@ -219,9 +225,11 @@ class MSO_to_NTA_Parser:
             return left_complement.union(right_automaton)
         
         elif ast['type'] == 'in':
-            print("IN not implemented yet!")
-            print("TODO: Implement IN operator construction!")
-            pass
+            set_var = ast['set_var']
+            elem_var = ast['elem_var']
+            set_idx = self.bound_variables[set_var]
+            elem_idx = self.bound_variables[elem_var]
+            return in_Set(set_idx, elem_idx, self.alphabet, self.k)
 
         elif ast['type'] == 'predicate':
             char = ast['symbol']
@@ -229,24 +237,28 @@ class MSO_to_NTA_Parser:
             var_idx = self.bound_variables[var]
             return symb(char, var_idx, self.alphabet, self.k)
         
+        elif ast['type'] == 'even':
+            var = ast['var']
+            var_idx = self.bound_variables[var]
+            return even(var_idx, self.alphabet, self.k)
 if __name__ == "__main__":
     alphabet = {
         "a":2,
         "b":2,
         "c":2,
         "d":1,
-        "x":0,
-        "y":0
+        "m":0,
+        "n":0
     }
 
-    t1n1 = Node("x", 1, [])
-    t1n2 = Node("x", 2, [])
-    t1n3 = Node("y", 3, [])
-    t1n4 = Node("y", 4, [])
-    t1n5 = Node("x", 5, [])
-    t1n6 = Node("y", 6, [])
-    t1n7 = Node("x", 7, [])
-    t1n8 = Node("y", 8, [])
+    t1n1 = Node("m", 1, [])
+    t1n2 = Node("m", 2, [])
+    t1n3 = Node("n", 3, [])
+    t1n4 = Node("n", 4, [])
+    t1n5 = Node("m", 5, [])
+    t1n6 = Node("n", 6, [])
+    t1n7 = Node("m", 7, [])
+    t1n8 = Node("n", 8, [])
     t1n9 = Node("c", 9, [t1n1, t1n2])
     t1n10 = Node("a", 10, [t1n3, t1n4])
     t1n11 = Node("a", 11, [t1n5, t1n6])
@@ -257,14 +269,14 @@ if __name__ == "__main__":
     t1n16 = Node("d", 16, [t1n14])
     t1n17 = Node("a", 17, [t1n15, t1n16])
 
-    t2n1 = Node("x", 1, [])
-    t2n2 = Node("x", 2, [])
-    t2n3 = Node("y", 3, [])
-    t2n4 = Node("y", 4, [])
-    t2n5 = Node("x", 5, [])
-    t2n6 = Node("y", 6, [])
-    t2n7 = Node("x", 7, [])
-    t2n8 = Node("y", 8, [])
+    t2n1 = Node("m", 1, [])
+    t2n2 = Node("m", 2, [])
+    t2n3 = Node("n", 3, [])
+    t2n4 = Node("n", 4, [])
+    t2n5 = Node("m", 5, [])
+    t2n6 = Node("n", 6, [])
+    t2n7 = Node("m", 7, [])
+    t2n8 = Node("n", 8, [])
     t2n9 = Node("c", 9, [t2n1, t2n2])
     t2n10 = Node("a", 10, [t2n3, t2n4])
     t2n11 = Node("a", 11, [t2n5, t2n6])
@@ -275,21 +287,21 @@ if __name__ == "__main__":
     t2n16 = Node("d", 16, [t2n14])
     t2n17 = Node("a", 17, [t2n15, t2n16])
 
-    t3n1 = Node("x", 1, [])
-    t3n2 = Node("x", 2, [])
-    t3n3 = Node("y", 3, [])
-    t3n4 = Node("y", 4, [])
-    t3n5 = Node("x", 5, [])
-    t3n6 = Node("y", 6, [])
-    t3n7 = Node("x", 7, [])
-    t3n8 = Node("y", 8, [])
+    t3n1 = Node("n", 1, [])
+    t3n2 = Node("m", 2, [])
+    t3n3 = Node("n", 3, [])
+    t3n4 = Node("n", 4, [])
+    t3n5 = Node("m", 5, [])
+    t3n6 = Node("n", 6, [])
+    t3n7 = Node("m", 7, [])
+    t3n8 = Node("n", 8, [])
     t3n9 = Node("c", 9, [t3n1, t3n2])
     t3n10 = Node("a", 10, [t3n3, t3n4])
     t3n11 = Node("a", 11, [t3n5, t3n6])
     t3n12 = Node("c", 12, [t3n7, t3n8])
     t3n13 = Node("a", 13, [t3n9, t3n10])
     t3n14 = Node("b", 14, [t3n11, t3n12])
-    t3n15 = Node("a", 15, [t3n13, t3n14])
+    t3n15 = Node("b", 15, [t3n13, t3n14])
 
     tree1 = RootedTree(t1n17, [t1n1, t1n2, t1n3, t1n4, t1n5, t1n6, t1n7, t1n8, t1n9, t1n10, t1n11, t1n12, t1n13, t1n14, t1n15, t1n16, t1n17])
 
@@ -301,14 +313,16 @@ if __name__ == "__main__":
     print("Tree 2: ", tree2)
     print("Tree 3: ", tree3)
 
-    """
+   
 
     k = 2
 
     parser = MSO_to_NTA_Parser(alphabet, k)
 
     #formula = "∃x(∃y(and(P_a(x),and(P_b(y),left(x,y)))))"
-    formula = "∀x(∃y(->(P_b(x),and(P_a(y),left(y,x)))))"
+    #formula = "∀x(∃y(->(P_b(x),and(P_a(y),left(y,x)))))"
+    formula = "∃X(∀y(and(   <->(in(X,y),   or(P_a(y),  P_m(y))   )  ,   even(X))))"
+
     #formula = "∀x(∃y(∃z(    and(  ->(P_b(x),and(P_a(y),left(y,x)))  , P_d(z)  )    )))"
     #formula = "∃x(∃y(and(and(P_b(x),P_c(y)),left(y,x))))"
     
@@ -321,4 +335,4 @@ if __name__ == "__main__":
     print("Tree 2 accepted: ", automaton.nta_run(tree2))
     print("Tree 3 accepted: ", automaton.nta_run(tree3))
 
-    """
+ 
