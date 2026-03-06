@@ -70,7 +70,7 @@ class TreeAutomaton:
                 print(node.label, " not in input symbols!")
                 state_dict[node] = []
         
-        #print("Final state dict: ", [{x.label: state_dict[x]} for x in state_dict.keys()])
+        print("Final state dict: ", [{x.label: state_dict[x]} for x in state_dict.keys()])
         #print("Possible states at root: ", state_dict[tree.root])
         
         # Check if any of the possible states at the root is an accepting state
