@@ -38,32 +38,61 @@ def gen_new_alphabet(alphabet, k):
 
 """
 Works for treewidth up to 6, k is number of quantors
-Alphabet will be of form ({a, b, c, d, e, f, g} x {a, b, c, d, e, f, g}) x ({0, 1} x {0, 1})^k + "//" + ren_ and miv_ for every symbol
+Alphabet will be of form ({a, b, c, d, e, f, g} x {0, 1}^k + "//" + ren_ and miv_ for every symbol x {0,1}^k
 Leafs represent the edge introductions and have arity 0
-Every symbol needs to have every 2-bit combination for each of the k quantors, i.e. for k=2
-and symbol ab we need ("ab", "00", "01"), ("ab", "10", "11"), ... in the alphabet 
-In the end "//" is added with arity 2 and ren_ and miv_ for every symbol with arity 1
+so we have symbols like ("ab", 0, 1) or ("miv_a", 1, 0) or // (parallel composition) or ren_ab (renaming a to b)
+Form:
+    ({a, b, c, d, e, f, g} x {0,1}^k for edge symbols like "ab")
+    + ("miv_x" x {0,1}^k)
+    + ("ren_xy")
+    + {"//"}.
+
 """
-def gen_courcelle_alphabet(tree_width, k):
-    new_alphabet = []
-    sym_k = symbols[:tree_width+1]
+def gen_courcelle_alphabet(treewidth, k):
+    from itertools import product
+
+    sym_k = symbols[:treewidth + 1]
+    bit_vectors = list(product((0, 1), repeat=k))
+
+    ranked_alphabet = {}
+
+    if k == 0:
+        for s1 in sym_k:
+            for s2 in sym_k:
+                if s1 == s2:
+                    continue
+                edge = s1 + s2
+                ranked_alphabet[edge] = 0
+        for x in sym_k:
+            ranked_alphabet[f"miv_{x}"] = 1
+        ranked_alphabet["//"] = 2
+        return ranked_alphabet
+
+    # Arity-0 leaves: edge introductions ("ab", b1, ..., bk)
     for s1 in sym_k:
         for s2 in sym_k:
             if s1 == s2:
                 continue
-            pair = s1 + s2
-            def generate_tuples(current_tuple, depth, sym=pair):
-                if depth == k:
-                    new_alphabet.append((sym,) + current_tuple)
-                    return
-                for bits in ["00", "01", "10", "11"]:
-                    generate_tuples(current_tuple + (bits,), depth + 1, sym)
-            generate_tuples((), 0)
-    ranked_alphabet = {sym: 0 for sym in new_alphabet}
+            edge = s1 + s2
+            for bits in bit_vectors:
+                ranked_alphabet[(edge,) + bits] = 0
+
+    # Arity-1: miv_x x {0,1}^k
+    for x in sym_k:
+        for bits in bit_vectors:
+            ranked_alphabet[(f"miv_{x}",) + bits] = 1
+    """ No rename yet
+    # Arity-1: ren_xy (no bit vector)
+    for s1 in sym_k:
+        for s2 in sym_k:
+            if s1 != s2:
+                ranked_alphabet[f"ren_{s1}{s2}"] = 1
+    """
+    # Arity-2: parallel composition
     ranked_alphabet["//"] = 2
-    functional_symbols = {f"ren_{s1}{s2}": 1 for s1 in sym_k for s2 in sym_k if s1 != s2} | {f"miv_{x}": 1 for x in sym_k}
-    ranked_alphabet.update(functional_symbols)
+
     return ranked_alphabet
+
 
 if __name__ == "__main__":
     print(gen_courcelle_alphabet(2, 2))

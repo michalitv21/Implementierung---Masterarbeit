@@ -1,6 +1,6 @@
 from collections import deque
 from treeDecomp import Node, RootedTree
-from StringCase.utils import gen_new_alphabet, powerset
+from StringCase.utils import gen_courcelle_alphabet, gen_new_alphabet, powerset
 import random
 import time
 
@@ -70,7 +70,7 @@ class TreeAutomaton:
                 print(node.label, " not in input symbols!")
                 state_dict[node] = []
         
-        print("Final state dict: ", [{x.label: state_dict[x]} for x in state_dict.keys()])
+        #print("Final state dict: ", [{x.label: state_dict[x]} for x in state_dict.keys()])
         #print("Possible states at root: ", state_dict[tree.root])
         
         # Check if any of the possible states at the root is an accepting state
@@ -319,10 +319,10 @@ class TreeAutomaton:
             new_transitions[symbol] = new_state
             reachable_states.add(new_state)
             queue.append(new_state)
-            print(f"  [{idx+1}/{len(leaf_symbols)}] Symbol '{symbol}' → state {new_state}")
+            #print(f"  [{idx+1}/{len(leaf_symbols)}] Symbol '{symbol}' → state {new_state}")
         
         step1_time = time.time() - step1_start
-        print(f"  ✓ Initial reachable states: {len(reachable_states)} (in {step1_time:.3f}s)\n")
+        #print(f"  ✓ Initial reachable states: {len(reachable_states)} (in {step1_time:.3f}s)\n")
         
         # Step 2: BFS to explore reachable states
         print("Step 2: Exploring reachable states via BFS...")
@@ -335,8 +335,8 @@ class TreeAutomaton:
         unary_symbols = [symbol for symbol, arity in self.input_symbols.items() if arity == 1]
         binary_symbols = [symbol for symbol, arity in self.input_symbols.items() if arity == 2]
         
-        print("Binary symbols: ", binary_symbols)
-        print("Unary symbols: ", unary_symbols)
+        #print("Binary symbols: ", binary_symbols)
+        #print("Unary symbols: ", unary_symbols)
 
         print(f"  Processing {len(unary_symbols)} unary and {len(binary_symbols)} binary symbols")
         
@@ -360,7 +360,7 @@ class TreeAutomaton:
                 
                 if current_state not in new_transitions[symbol]:
                     resulting_states = set()
-                    print("Current state: ", current_state)
+                    #print("Current state: ", current_state)
                     for nta_state in current_state:
                         if nta_state in self.transitions[symbol]:
                             result = self.transitions[symbol][nta_state]
@@ -540,7 +540,9 @@ class TreeAutomaton:
         new_final_states = {(s1, s2) for s1 in self.states for s2 in other.states if s1 in self.final_states and s2 in other.final_states}
         #print(new_final_states)
         new_transitions = {}
-        
+        #print("self symbols: ", self.input_symbols)
+        #print("---------------------------")
+        #print("other symbols: ", other.input_symbols)
         for char in self.input_symbols.keys():  # Assuming both automata have the same input symbols
             new_transitions[char] = {}
             if self.input_symbols[char] == 0:
@@ -770,6 +772,178 @@ class TreeAutomaton:
                 if verbose and transition_count > 5:
                     print(f"      ... and {transition_count - 5} more transitions")
         
+        if verbose:
+            print("\n" + "="*70)
+            print("PROJECTION COMPLETE")
+            print(f"New alphabet: {set(new_input_symbols.keys())}")
+            print(f"States: {self.states}")
+            print(f"Final states: {self.final_states}")
+            print("="*70 + "\n")
+        
+        return TreeAutomaton(
+            states=self.states,
+            input_symbols=new_input_symbols,
+            final_states=self.final_states,
+            transitions=new_transitions
+        )
+
+    def project_courcelle(self, alphabet, treewidth, j,  verbose=False):
+        print("Projecting automaton by removing last coordinate...")
+        """
+        Project away the LAST coordinate from tuple-based alphabet symbols.
+        This removes the rightmost element representing set membership.
+        Creates nondeterministic transitions when multiple symbols project to the same one.
+        
+        Difference for courcelle: "//" Element has no
+
+        Args:
+            alphabet: Set of base alphabet symbols (e.g., {'a', 'b'})
+            j: Depth level for generating the new alphabet using gen_new_alphabet
+            verbose: If True, print detailed debug output during projection
+        
+        Examples:
+            ("b", 0, 1) → ("b", 0)
+            ("b", 0) → "b"
+        """
+
+        if verbose:
+            print("\n" + "="*70)
+            print(f"STARTING PROJECTION (removing last coordinate)")
+            print(f"Base alphabet: {alphabet}, depth level j={j}")
+            print("="*70)
+        
+        new_input_symbols = {}
+        new_transitions = {}
+        
+        # Determine the new alphabet based on projection depth
+        if j - 1 == 0:
+            # After projection, we're at the base alphabet level
+            new_alphabet = gen_courcelle_alphabet(treewidth, 0)
+            if verbose:
+                print(f"New alphabet (j=1): {new_alphabet}")
+        else:
+            # Generate new alphabet for projection depth j-1
+            new_alphabet = gen_courcelle_alphabet(treewidth, j - 1)
+            if verbose:
+                print(f"New alphabet (j={j}): {new_alphabet}")
+        
+        # Build mapping from old chars to new chars (removing LAST coordinate)
+        char_mapping = {}
+        if verbose:
+            print(f"\nStep 1: Building character mapping (removing last coordinate)...")
+        
+        for old_char in self.input_symbols.keys():
+            if isinstance(old_char, tuple):
+                # Remove LAST element
+                new_char = old_char[:-1]
+                # If only one element left, unwrap the tuple
+                if len(new_char) == 1:
+                    new_char = new_char[0]
+                char_mapping[old_char] = new_char
+                if new_char in new_alphabet or (isinstance(new_char, tuple) and new_char in new_alphabet):
+                    new_input_symbols[new_char] = self.input_symbols[old_char]
+                    if verbose:
+                        print(f"  {old_char} → {new_char} (arity: {self.input_symbols[old_char]})")
+            else:
+                # Not a tuple, keep as is if in new alphabet
+                if old_char in new_alphabet:
+                    char_mapping[old_char] = old_char
+                    new_input_symbols[old_char] = self.input_symbols[old_char]
+                    if verbose:
+                        print(f"  {old_char} → {old_char} (unchanged, arity: {self.input_symbols[old_char]})")
+        
+        # Build new transitions by grouping old transitions that map to same new char
+        if verbose:
+            print("\nStep 2: Building new transitions...")
+        for new_char in new_input_symbols.keys():
+            arity = new_input_symbols[new_char]
+            
+            # Find all old chars that project to this new char
+            old_chars_for_new = [oc for oc, nc in char_mapping.items() if nc == new_char]
+            if verbose:
+                print(f"\n  Processing '{new_char}' (arity={arity}):")
+                print(f"    Old chars projecting to this: {old_chars_for_new}")
+            
+            if arity == 0:
+                # Leaf transitions: collect all states from old chars
+                collected_states = []
+                for old_char in old_chars_for_new:
+                    old_transition = self.transitions[old_char]
+                    if verbose:
+                        print(f"      From '{old_char}': {old_transition}")
+                    if isinstance(old_transition, list):
+                        collected_states.extend(old_transition)
+                    else:
+                        collected_states.append(old_transition)
+                
+                # Store as list if multiple states, single state otherwise
+                if len(collected_states) > 1:
+                    new_transitions[new_char] = collected_states
+                    if verbose:
+                        print(f"    → Result (nondeterministic): {collected_states}")
+                elif len(collected_states) == 1:
+                    new_transitions[new_char] = collected_states[0]
+                    if verbose:
+                        print(f"    → Result (deterministic): {collected_states[0]}")
+            
+            elif arity == 1:
+                # Unary transitions
+                new_transitions[new_char] = {}
+                print("New char: ", new_char)
+                if verbose:
+                    print(f"    Building unary transitions...")
+                for state in self.states:
+                    combined_results = []
+                    for old_char in old_chars_for_new:
+                        if state in self.transitions[old_char]:
+                            result = self.transitions[old_char][state]
+                            if isinstance(result, list):
+                                combined_results.extend(result)
+                            else:
+                                combined_results.append(result)
+                    
+                    if len(combined_results) > 1:
+                        new_transitions[new_char][state] = combined_results
+                        if verbose:
+                            print(f"      δ({state}) = {combined_results} (nondeterministic)")
+                    elif len(combined_results) == 1:
+                        new_transitions[new_char][state] = combined_results[0]
+                        if verbose:
+                            print(f"      δ({state}) = {combined_results[0]}")
+            
+            elif arity == 2:
+                new_transitions[new_char] = self.transitions[new_char]
+                """
+                # Binary transitions
+                new_transitions[new_char] = {}
+                if verbose:
+                    print(f"    Building binary transitions...")
+                transition_count = 0
+                for state1 in self.states:
+                    new_transitions[new_char][state1] = {}
+                    for state2 in self.states:
+                        combined_results = []
+                        for old_char in old_chars_for_new:
+                            if state1 in self.transitions[old_char] and state2 in self.transitions[old_char][state1]:
+                                result = self.transitions[old_char][state1][state2]
+                                if isinstance(result, list):
+                                    combined_results.extend(result)
+                                else:
+                                    combined_results.append(result)
+                        
+                        if len(combined_results) > 1:
+                            new_transitions[new_char][state1][state2] = combined_results
+                            transition_count += 1
+                            if verbose and transition_count <= 5:  # Only print first few to avoid clutter
+                                print(f"      δ({state1}, {state2}) = {combined_results} (nondeterministic)")
+                        elif len(combined_results) == 1:
+                            new_transitions[new_char][state1][state2] = combined_results[0]
+                            transition_count += 1
+                            if verbose and transition_count <= 5:
+                                print(f"      δ({state1}, {state2}) = {combined_results[0]}")
+                if verbose and transition_count > 5:
+                    print(f"      ... and {transition_count - 5} more transitions")
+        """
         if verbose:
             print("\n" + "="*70)
             print("PROJECTION COMPLETE")
